@@ -419,6 +419,11 @@ end
 # ╔═╡ f9efb41e-ec65-11ea-128a-77f4376ed9e4
 md"""
 ### Example - Type I and II errors
+
+In statistics:
+* A Type 1 error (false positive) occurs when a true null hypothesis is incorrectly rejected. It means detecting an effect or difference that isn’t actually there.
+* A Type 2 error (false negative) occurs when a false null hypothesis is not rejected. It means failing to detect an effect or difference that actually exists.
+
 We want to:
 !!! info "Goals"
 	- Visualize a probality distribution, both the PDF and the CDF, e.g $X\sim N \left( 10,2  \right)$.
