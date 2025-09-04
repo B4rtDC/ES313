@@ -27,6 +27,7 @@ begin
 	using Measures
 	using Dates
 	#using JLD # removed because JLD does not work on CDN
+	using CSV
 end
 
 # ╔═╡ 9f0fff31-d180-499b-b8a4-27d09f9311c2
@@ -477,9 +478,9 @@ end
 md"""
 ### Example - PDF/CDF/QQ
 We have data and we want to:
-* show the emperical and theoretical PDF 
-* show the emperical and theoretical CDF 
-* get an idea to what extent the data matches a proposed distribution by means of a PP/QQ plot
+* Show the emperical and theoretical PDF 
+* Show the emperical and theoretical CDF 
+* Get an idea to what extent the data matches a proposed distribution by means of a PP/QQ plot
 """
 
 # ╔═╡ 4a754fca-ec66-11ea-3716-75e22e7cfed8
@@ -508,9 +509,9 @@ md"""
 ### Example - Histograms
 
 We have generated some data and want to make 
-* a histogram representation (counts).
-* a PDF estimation (percentages).
-* a [kernel density estimation](https://en.wikipedia.org/wiki/Kernel_density_estimation).
+* A histogram representation (counts).
+* A PDF estimation (percentages).
+* A [kernel density estimation](https://en.wikipedia.org/wiki/Kernel_density_estimation).
 """
 
 # ╔═╡ 4a4ad0c4-ec66-11ea-2fe0-7d446c995ea3
