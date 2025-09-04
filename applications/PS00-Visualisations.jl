@@ -155,7 +155,7 @@ begin
 	# customising the axis ticks
 	yticks!([0, 2, 4, 6, 8, 10],[L"0", L"2", L"4", L"y_{max} (6)", L"8", L"10"])
 	xticks!(range(0,maximum(x),step=2),[L"0", L"2", L"4", L"6 (x_{opt})", L"8", L"10"])
-	# customizing the axis £limits
+	# customizing the axis limits
 	ylims!(0,10)
 	xlims!(0,10)
 end
@@ -421,9 +421,9 @@ md"""
 ### Example - Type I and II errors
 We want to:
 !!! info "Goals"
-	- visualize a probality distribution, both the PDF and the CDF, e.g $X\sim N \left( 10,2  \right)$.
-	- highlight some accents (annotations)
-	- gain additional understanding of the concept type II errors. For $\alpha = 0.025$ and for the following $H_0: E[X]<=10,H_1: E[X]>10$ and we are interested in the type II error if $E[X]=16$
+	- Visualize a probality distribution, both the PDF and the CDF, e.g $X\sim N \left( 10,2  \right)$.
+	- Highlight some accents (annotations)
+	- Gain additional understanding of the concept type II errors. For $\alpha = 0.025$ and for the following $H_0: E[X]<=10,H_1: E[X]>10$ and we are interested in the type II error if $E[X]=16$
 """
 
 # ╔═╡ f9d800da-ec65-11ea-279b-4558590a769b
