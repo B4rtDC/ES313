@@ -92,7 +92,7 @@ end
 
 # ╔═╡ a9547c5c-09e4-4336-b3d2-62e93efb15ac
 with_terminal() do
-	for (method, args) in zip(methods(foo), [(1,2,4); ("177","POL"); ("PO",2)])
+	for (method, args) in zip(methods(foo), [(1,2,4); ("178","POL"); ("PO",2)])
 		println(method)
 		println("foo($(join(args,", "))) = $(foo(args...))  (this is a ::$(typeof(foo(args...))))")
 	end
