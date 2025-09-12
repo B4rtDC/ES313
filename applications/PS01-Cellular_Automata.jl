@@ -108,10 +108,12 @@ A rule e.g. '123456' is interpreted in the following way: 'Current-Top-Right-Bot
 
 ## Problem solution
 We split the problem in a series of subproblems:
-* transforming the rule list (.txt) to someting usable (function)
-* creating the standard layout
-* identifying the neighbours of a cel
-* visualising the result
+
+!!! tip "Subproblems"
+	* transforming the rule list (.txt) to someting usable (function)
+	* creating the standard layout
+	* identifying the neighbours of a cel
+	* visualising the result
 
 
 ___
@@ -273,7 +275,7 @@ md"""
 """
 	Langton
 
-DataType used to represented a Langton loop
+DataType used to represent a Langton loop
 """
 struct Langton
 	state::Array{Int64,2}

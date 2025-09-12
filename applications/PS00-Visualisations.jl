@@ -635,7 +635,7 @@ Perform the following tasks at your own discretion.
 !!! info "Assignments"
 	* Acquaint yourself with the features you saw before. Make sure to focus on different methods of representing data.
 	* Generate a histogram representing the birthdays of your colleagues. Also make a kernel density estimation and show this as a transparant overlay on the same figure. Save as a .pdf and compare with the other language group.
-	* Discover the website of the Belgian Statistical Agency: [STATBEL](https://statbel.fgov.be/language_selection_page?destination=/node/15). The data on display can be downloaded as a .csv file (consult [Importing and Exporting Data (I/O)](https://dataframes.juliadata.org/stable/man/importing_and_exporting/)). Choose a dataset to your liking and reproduce it in Julia.
+	* Discover the website of the Belgian Statistical Agency: [STATBEL](https://statbel.fgov.be/language_selection_page?destination=/node/15). The data on display can be downloaded as a `.csv` file (consult [Importing and Exporting Data (I/O)](https://dataframes.juliadata.org/stable/man/importing_and_exporting/)). Choose a dataset to your liking and reproduce it in Julia.
 	* ...
 """
 
@@ -645,6 +645,8 @@ md"""
 There is a lot of additional information available on the webpages of the different packages.
 * [Plots](https://docs.juliaplots.org/latest/)
 * [StatsPlots](https://github.com/JuliaPlots/StatsPlots.jl)
+
+For interactive plots, consider using [Makie](https://docs.makie.org/stable/)
 
 Another other nice resource is [Interactive Visualization and Plotting with Julia](https://packtpublishing.github.io/Interactive-Visualization-and-Plotting-with-Julia/).
 
