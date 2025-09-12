@@ -477,6 +477,8 @@ md"""
 	* **pn** - state after reading the nth character initially - now go right and search for the end of the string, marked by a zero.
 	* **rn** - state after finding zero on the end of the string - now compare the last character of the string. If it's a palindrome, it should be the same as the nth character that we read at the beginning, and we go into state q2. else, go to state qn, meaning "no, its not a palindrome."
 	* **q2** - state after sucessful comparison of last character in string - now go left and search for the beginning of the string, marked by a zero. Restart the loop by going to q1.
+	* **qy** - state wherein you can accept that the input is a palindrome.
+	* **qn** - state wherein you reject the input being a palindrome.
 """
 
 # ╔═╡ 43421788-e6f4-4a6b-ae64-93a04050954e
