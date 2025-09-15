@@ -442,7 +442,7 @@ Another of the many possible implementations of the Turing Machine is a palindro
 !!! info "Palindrome"
 	A palindrome is a word which, read backwards, returns the exact same word.
 
-For the sake of this exercise, we will work with integers. E.g. [1, 2, 3, 2, 1] is a palindrome, whereas [1, 1, 3, 2, 1] is not.
+For the sake of this exercise, we will work with integers. E.g. [1, 2, 3, 2, 1] is a palindrome, whereas [1, 1, 3, 2, 1] is not. The value `0` is reserved for an 'empty' space.
 """
 
 # ╔═╡ 785790f1-e2e4-4c21-97ae-ed36e598149d
