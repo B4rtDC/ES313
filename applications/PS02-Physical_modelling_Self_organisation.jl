@@ -122,7 +122,7 @@ The value of ``M_{3 \times 3}(x_0)`` is then used to apply a simple rule:
 
 ``\begin{aligned} R_1: & \quad \text{If } M_{3 \times 3}(x_0) = 1 \quad \text{then}  \quad x_0(k+1) = x_0(k) + 1 \\ R_2: & \quad \text{If } M_{3 \times 3}(x_0) = -1 \quad \text{then} \quad x_0(k+1) = x_0(k) - 1 \\ R_3: & \quad \text{If } M_{3 \times 3}(x_0) = 0 \quad \text{then} \quad x_0(k+1) = x_0(k) \end{aligned}``
 
-This step is applied *iter1* times.
+Where `k` indicates the iteration. This step is applied *iter1* times.
 
 ### Rule 2
 
