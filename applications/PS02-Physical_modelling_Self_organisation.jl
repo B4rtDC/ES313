@@ -97,7 +97,9 @@ end
 md"""
 ## Encoding the rules
 
-Go over the refernced paper and extract the rules of the CA. You should perceive the pixel intensity as the physical phenomenon we are studying. For the sake of consistency, rescale the pixel intensities to have a value between 0 and 255.
+Go over the referenced paper and extract the rules of the CA. You should perceive the pixel intensity as the physical phenomenon we are studying. 
+!!! warning "Pixel Scale"
+	For the sake of consistency, rescale the pixel intensities to have a value between 0 and 255.
 
 ### Rule 1
 
@@ -140,7 +142,7 @@ This step is applied *iter2* times.
 
 ### Rule 3
 
-In a last step, the elements of the CA undergo a process that results in the identification of regions or objects characterized by homogeneous intensities and clearly defined edges. Each element is a assigned a final state. This is achieved through the division of the range of intensity levels or states into a smaller number of segments. The amount of segments can be chosen manually. We will call this value ``n``.
+In a last step, the elements of the CA undergo a process that results in the identification of regions or objects characterized by homogeneous intensities and clearly defined edges. Each element is assigned a final state. This is achieved through the division of the range of intensity levels or states into a smaller number of segments. The amount of segments can be chosen manually. We will call this value ``n``.
 
 ``x_0(k+1) = \text{round}\left(\frac{x_0(k)}{n}\right)``
 
