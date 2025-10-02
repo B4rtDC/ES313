@@ -11,6 +11,6 @@ secrets.md
 /lectures/theory.txt
 /applications/applications.txt
 all_julia_files.txt
-/buffer/
+/buffer/*
 settings.json
 .gitignore
