@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.46
+# v0.20.13
 
 using Markdown
 using InteractiveUtils
@@ -26,46 +26,38 @@ html"""
 </style>
 """
 
-# ╔═╡ 69a9e78f-1150-4914-9772-d8feedd13fd0
+# ╔═╡ abd51e4f-6e18-461a-9882-a79a405bc1e2
 md"""
-# 2025 Project Ideas
-### Simulation-based improvement of medical examination throughput
-This project aims to model and simulate the medical examination pathway for SAO/DOO candidates to improve efficiency. 
-The current system, using predefined groups and schedules, reportedly experiences variable loads leading to both idle time and congestion. 
-Students will collect operational data, build and validate a simulation model, and experiment with alternative process configurations 
-(e.g., scheduling logic, group sizes) to propose evidence-based recommendations for reducing bottlenecks and improving overall throughput.
-This project will be conducted in collaboration with the staff of MHQA.
-
-# 2024 Project Ideas
+# General introduction
 
 ## Overview
 For this assignment, you’ll select a project to design and develop a model based on one of the provided themes. Each project is outlined in a generic manner, allowing you the flexibility to define the specific focus and scope. Background resources are provided to inspire your approach, though they often extend beyond the level of detail expected here.
 
-### Key Requirements
+!!! info "Key Requirements"
 
-1. **Problem definition**: Clearly define the context or problem you will study. This should include the problem's practical relevance and any relevant parameters.
-2. **Desired outcome**: Specify what you aim to quantify or measure. This should be an achievable outcome for the model to generate results that inform your understanding of the problem.
-3. **Model construction**: Describe your model’s structure, parameters, and constraints. Discuss any limitations, simplifications, or hypotheses you've accepted in order to make the problem manageable.
-4. **Model analysis**: Carry out a thorough analysis of your model. This may include:
-   - Comparative studies (e.g., comparing with established results or similar models)
-   - Sensitivity analyses to understand how changes in parameters affect results
-   - Optimization of key parameters, if applicable
-5. **Conclusion and Discussion**: Summarize your findings. Reflect on the model's performance, the reliability of its outcomes, and the limitations of your approach.
+	1. **Problem definition**: Clearly define the context or problem you will study. This should include the problem's practical relevance and any relevant parameters.
+	2. **Desired outcome**: Specify what you aim to quantify or measure. This should be an achievable outcome for the model to generate results that inform your understanding of the problem.
+	3. **Model construction**: Describe your model’s structure, parameters, and constraints. Discuss any limitations, simplifications, or hypotheses you've accepted in order to make the problem manageable.
+	4. **Model analysis**: Carry out a thorough analysis of your model. This may include:
+	   - Comparative studies (e.g., comparing with established results or similar models)
+	   - Sensitivity analyses to understand how changes in parameters affect results
+	   - Optimization of key parameters, if applicable
+	5. **Conclusion and Discussion**: Summarize your findings. Reflect on the model's performance, the reliability of its outcomes, and the limitations of your approach.
 
 ### Project presentation and evaluation
 
-#### Oral presentation (30 minutes)
-You will present your project, highlighting key aspects without going into extensive code details. However, you should cover:
-- **Essential Data Structures and Algorithms**: Explain the choice and role of key elements.
-- **Model Demonstrations**: Share minimum working examples that showcase model functionality and performance.
-- **Codebase Submission**: Provide your full codebase, as it will be part of the evaluation.
+!!! info "Oral presentation (30 minutes)"
+	You will present your project, highlighting key aspects without going into extensive code details. However, you should cover:
+	- **Essential Data Structures and Algorithms**: Explain the choice and role of key elements.
+	- **Model Demonstrations**: Share minimum working examples that showcase model functionality and performance.
+	- **Codebase Submission**: Provide your full codebase, as it will be part of the evaluation.
 
-#### Grading criteria
-Your project will be assessed on:
-- **Conceptual Approach**: The originality and clarity of your approach to the problem.
-- **Modeling and Analysis**: The soundness and depth of your modeling and analysis methods.
-- **Model Exploitation**: The quality of results derived from your model and any optimizations or insights you provide.
-- **Conclusions**: The robustness of your conclusions based on the analysis.
+!!! info "Grading criteria"
+	Your project will be assessed on:
+	- **Conceptual Approach**: The originality and clarity of your approach to the problem.
+	- **Modeling and Analysis**: The soundness and depth of your modeling and analysis methods.
+	- **Model Exploitation**: The quality of results derived from your model and any optimizations or insights you provide.
+	- **Conclusions**: The robustness of your conclusions based on the analysis.
 
 Approach each stage with both creativity and rigor!
 
@@ -75,6 +67,62 @@ Approach each stage with both creativity and rigor!
 * [Modeling and Simulation in Engineering](https://www.mdpi.com/books/book/6451-modeling-and-simulation-in-engineering)
 * [Engineering Principles of Combat Modeling and Distributed Simulation](https://www.wiley.com/en-us/Engineering+Principles+of+Combat+Modeling+and+Distributed+Simulation-p-9781118180310)
 * [Introduction to Transportation Analysis, Modeling and Simulation - Computational Foundations and Multimodal Applications](https://link.springer.com/book/10.1007/978-1-4471-5637-6)
+
+"""
+
+# ╔═╡ 07965656-a4fe-449c-898b-2fed7e755c42
+md"""
+# 2025 Project Ideas
+## Simulation-based improvement of medical examination throughput
+This project aims to model and simulate the medical examination pathway for SAO/DOO candidates to improve efficiency. 
+The current system, using predefined groups and schedules, reportedly experiences variable loads leading to both idle time and congestion. 
+Students will collect operational data, build and validate a simulation model, and experiment with alternative process configurations 
+(e.g., scheduling logic, group sizes) to propose evidence-based recommendations for reducing bottlenecks and improving overall throughput.
+This project will be conducted in collaboration with the staff of MHQA.
+
+## Environmental Impact of Renewable Energy Adoption
+
+The focus is on understanding how the increased integration of renewable energy sources like solar and wind into an existing electricity grid affects environmental outcomes, particularly CO2 emissions, grid stability, and energy reliability. Key parameters include renewable energy penetration rate, energy demand profiles, storage capacity, and variability in renewable generation.
+
+(Suggested) outcome:
+* The reduction in overall CO2 emissions as renewable share increases.
+* Impacts on grid stability metrics such as supply-demand balance and frequency of power shortages.
+* The levels of energy storage capacity needed to maintain grid reliability.
+* Trade-offs between environmental benefits and operational challenges.
+
+(Suggested) model:
+* A discrete-time simulation model of the electricity grid (with a lot of simplifications).
+* Components:
+  * Power generation units.
+  * Energy storage (batteries)
+  * Demand profile.
+* Parameters:
+  * Penetration level of renewables.
+  * Capacity and efficiency of storage.
+  * Variability patterns of renewables.
+* Constraints and simplifications:
+  * The grid is assumed balanced if supply meets demand in each timestep.
+  * Transmission losses and market dynamics are simplified or omitted.
+  * Storage is modeled with generic efficiency and capacity limits.
+
+You can perform a *sensitivity analysis* on your model and perform comparative studies.
+
+## Water resource management
+
+You will have noticed that last summer, there were (again) talks about water shortages, whereas last year (2024) it hardly ever stopped raining and the ground became oversaturated. It seems like Belgium has some difficulties when it comes to water management and retaining water. Investigate whether you are able to model this phenomenon with the information that is publically available and suggest a mitigation strategy. Focus primarily on the so-called *quick wins*.
+
+## Smart Energy Management
+
+There are increasing advancements in the field of efficient energy management and resource optimization. For example, the goal is to use solar energy at the times it is produced and when energy prices (under a variable pricing contract) are at their lowest. Develop a simulation framework that allows you to model various home energy components, such as solar panels, home batteries, a bidirectional electric vehicle, and major appliances (e.g., air conditioning, washing machine, oven, etc.). Your objective is to design an optimal system that minimizes energy costs while maximizing overall home energy efficiency.
+
+## Teaching Schedule Optimization
+
+This challenge recurs every academic year: designing a course schedule that accommodates the availability of all involved personnel, including teaching staff, military instructors, PTI staff, and others. The goal is to produce a timetable that avoids conflicts and overlaps while maximizing efficiency, minimizing unwanted gaps between sessions, grouping consecutive blocks of lectures (N) and exercises (F) on the same day where possible, and respecting individual constraints. Develop an optimization model that takes as input the availability schedules of all personnel and outputs a conflict-free, efficient course timetable. The model should be user-friendly, with straightforward input requirements and easy-to-interpret scheduling results.
+"""
+
+# ╔═╡ 69a9e78f-1150-4914-9772-d8feedd13fd0
+md"""
+# 2024 Project Ideas
 
 ## Wargaming
 Wargaming is a tool for analyzing strategic decision-making in conflict scenarios. By digitizing a wargame model, we can run rapid simulations and perform statistical analysis on various strategies. Several wargames (boardgames) are made available by DefCol. Having this readily available would be very helpful for both educators and trainees. Moreover, when done properly, this could even be combined with reinforcement learning, to obtain the "perfect strategist".
@@ -226,9 +274,6 @@ Virtual machines (VMs) simulate computer systems, allowing us to explore core co
 * [Computer networking, a top down approach](https://github.com/kowsertusher/Book/blob/master/Computer.Networking%20A%20Top-Down%20Approach%206th%20Edition.pdf)
 
 """
-
-# ╔═╡ a31945c3-9701-4157-bc0b-cf970592aabe
-
 
 # ╔═╡ 94c57b2d-24c1-45d6-aba4-77aefd4da9bf
 md"""
@@ -677,8 +722,9 @@ Managing the electricity grid is a major challenge.
 # ╔═╡ Cell order:
 # ╟─fc0426fc-d2b6-4751-9c48-ecf31a7b5a3b
 # ╟─a795cad3-33a6-4664-a4b4-52b083ed4308
+# ╟─abd51e4f-6e18-461a-9882-a79a405bc1e2
+# ╠═07965656-a4fe-449c-898b-2fed7e755c42
 # ╟─69a9e78f-1150-4914-9772-d8feedd13fd0
-# ╠═a31945c3-9701-4157-bc0b-cf970592aabe
 # ╟─94c57b2d-24c1-45d6-aba4-77aefd4da9bf
 # ╟─5126163e-0f60-4712-97fd-5a085af91744
 # ╟─023da279-7a42-4cb1-addb-613d1363a282

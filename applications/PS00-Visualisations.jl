@@ -27,6 +27,7 @@ begin
 	using Measures
 	using Dates
 	#using JLD # removed because JLD does not work on CDN
+	using CSV
 end
 
 # ╔═╡ 9f0fff31-d180-499b-b8a4-27d09f9311c2
@@ -92,7 +93,7 @@ end
 
 # ╔═╡ a9547c5c-09e4-4336-b3d2-62e93efb15ac
 with_terminal() do
-	for (method, args) in zip(methods(foo), [(1,2,4); ("177","POL"); ("PO",2)])
+	for (method, args) in zip(methods(foo), [(1,2,4); ("178","POL"); ("PO",2)])
 		println(method)
 		println("foo($(join(args,", "))) = $(foo(args...))  (this is a ::$(typeof(foo(args...))))")
 	end
@@ -155,7 +156,7 @@ begin
 	# customising the axis ticks
 	yticks!([0, 2, 4, 6, 8, 10],[L"0", L"2", L"4", L"y_{max} (6)", L"8", L"10"])
 	xticks!(range(0,maximum(x),step=2),[L"0", L"2", L"4", L"6 (x_{opt})", L"8", L"10"])
-	# customizing the axis £limits
+	# customizing the axis limits
 	ylims!(0,10)
 	xlims!(0,10)
 end
@@ -419,11 +420,16 @@ end
 # ╔═╡ f9efb41e-ec65-11ea-128a-77f4376ed9e4
 md"""
 ### Example - Type I and II errors
+
+In statistics:
+* A Type 1 error (false positive) occurs when a true null hypothesis is incorrectly rejected. It means detecting an effect or difference that isn’t actually there.
+* A Type 2 error (false negative) occurs when a false null hypothesis is not rejected. It means failing to detect an effect or difference that actually exists.
+
 We want to:
 !!! info "Goals"
-	- visualize a probality distribution, both the PDF and the CDF, e.g $X\sim N \left( 10,2  \right)$.
-	- highlight some accents (annotations)
-	- gain additional understanding of the concept type II errors. For $\alpha = 0.025$ and for the following $H_0: E[X]<=10,H_1: E[X]>10$ and we are interested in the type II error if $E[X]=16$
+	- Visualize a probality distribution, both the PDF and the CDF, e.g $X\sim N \left( 10,2  \right)$.
+	- Highlight some accents (annotations)
+	- Gain additional understanding of the concept type II errors. For $\alpha = 0.025$ and for the following $H_0: E[X]<=10,H_1: E[X]>10$ and we are interested in the type II error if $E[X]=16$
 """
 
 # ╔═╡ f9d800da-ec65-11ea-279b-4558590a769b
@@ -472,9 +478,9 @@ end
 md"""
 ### Example - PDF/CDF/QQ
 We have data and we want to:
-* show the emperical and theoretical PDF 
-* show the emperical and theoretical CDF 
-* get an idea to what extent the data matches a proposed distribution by means of a PP/QQ plot
+* Show the emperical and theoretical PDF 
+* Show the emperical and theoretical CDF 
+* Get an idea to what extent the data matches a proposed distribution by means of a PP/QQ plot
 """
 
 # ╔═╡ 4a754fca-ec66-11ea-3716-75e22e7cfed8
@@ -503,9 +509,9 @@ md"""
 ### Example - Histograms
 
 We have generated some data and want to make 
-* a histogram representation (counts).
-* a PDF estimation (percentages).
-* a [kernel density estimation](https://en.wikipedia.org/wiki/Kernel_density_estimation).
+* A histogram representation (counts).
+* A PDF estimation (percentages).
+* A [kernel density estimation](https://en.wikipedia.org/wiki/Kernel_density_estimation).
 """
 
 # ╔═╡ 4a4ad0c4-ec66-11ea-2fe0-7d446c995ea3
@@ -629,7 +635,7 @@ Perform the following tasks at your own discretion.
 !!! info "Assignments"
 	* Acquaint yourself with the features you saw before. Make sure to focus on different methods of representing data.
 	* Generate a histogram representing the birthdays of your colleagues. Also make a kernel density estimation and show this as a transparant overlay on the same figure. Save as a .pdf and compare with the other language group.
-	* Discover the website of the Belgian Statistical Agency: [STATBEL](https://statbel.fgov.be/language_selection_page?destination=/node/15). The data on display can be downloaded as a .csv file (consult [Importing and Exporting Data (I/O)](https://dataframes.juliadata.org/stable/man/importing_and_exporting/)). Choose a dataset to your liking and reproduce it in Julia.
+	* Discover the website of the Belgian Statistical Agency: [STATBEL](https://statbel.fgov.be/language_selection_page?destination=/node/15). The data on display can be downloaded as a `.csv` file (consult [Importing and Exporting Data (I/O)](https://dataframes.juliadata.org/stable/man/importing_and_exporting/)). Choose a dataset to your liking and reproduce it in Julia.
 	* ...
 """
 
@@ -639,6 +645,8 @@ md"""
 There is a lot of additional information available on the webpages of the different packages.
 * [Plots](https://docs.juliaplots.org/latest/)
 * [StatsPlots](https://github.com/JuliaPlots/StatsPlots.jl)
+
+For interactive plots, consider using [Makie](https://docs.makie.org/stable/)
 
 Another other nice resource is [Interactive Visualization and Plotting with Julia](https://packtpublishing.github.io/Interactive-Visualization-and-Plotting-with-Julia/).
 

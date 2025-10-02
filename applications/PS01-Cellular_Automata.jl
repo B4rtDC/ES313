@@ -108,10 +108,12 @@ A rule e.g. '123456' is interpreted in the following way: 'Current-Top-Right-Bot
 
 ## Problem solution
 We split the problem in a series of subproblems:
-* transforming the rule list (.txt) to someting usable (function)
-* creating the standard layout
-* identifying the neighbours of a cel
-* visualising the result
+
+!!! tip "Subproblems"
+	* transforming the rule list (.txt) to someting usable (function)
+	* creating the standard layout
+	* identifying the neighbours of a cel
+	* visualising the result
 
 
 ___
@@ -273,7 +275,7 @@ md"""
 """
 	Langton
 
-DataType used to represented a Langton loop
+DataType used to represent a Langton loop
 """
 struct Langton
 	state::Array{Int64,2}
@@ -440,7 +442,7 @@ Another of the many possible implementations of the Turing Machine is a palindro
 !!! info "Palindrome"
 	A palindrome is a word which, read backwards, returns the exact same word.
 
-For the sake of this exercise, we will work with integers. E.g. [1, 2, 3, 2, 1] is a palindrome, whereas [1, 1, 3, 2, 1] is not.
+For the sake of this exercise, we will work with integers. E.g. [1, 2, 3, 2, 1] is a palindrome, whereas [1, 1, 3, 2, 1] is not. The value `0` is reserved for an 'empty' space.
 """
 
 # ╔═╡ 785790f1-e2e4-4c21-97ae-ed36e598149d
@@ -475,6 +477,8 @@ md"""
 	* **pn** - state after reading the nth character initially - now go right and search for the end of the string, marked by a zero.
 	* **rn** - state after finding zero on the end of the string - now compare the last character of the string. If it's a palindrome, it should be the same as the nth character that we read at the beginning, and we go into state q2. else, go to state qn, meaning "no, its not a palindrome."
 	* **q2** - state after sucessful comparison of last character in string - now go left and search for the beginning of the string, marked by a zero. Restart the loop by going to q1.
+	* **qy** - state wherein you can accept that the input is a palindrome.
+	* **qn** - state wherein you reject the input being a palindrome.
 """
 
 # ╔═╡ 43421788-e6f4-4a6b-ae64-93a04050954e

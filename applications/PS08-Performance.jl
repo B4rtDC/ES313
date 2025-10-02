@@ -157,6 +157,13 @@ md"""
 ## Hands-on
 
 ### String Joining
+
+How do they handle string concatenation?
+
+!!! danger "renew"
+	* `renew`: Julia strings are immutable. Each concatenation creates a new string. This leads to an $\mathcal{O}(n^2)$ complexity.
+!!! tip "buffer"
+	* `buffer`: Uses an *IOBuffer* as a mutable container to collect strings. Each iteration prints/appends the character to this buffer without copying the entire string repeatedly. Only once at the end, `take!(res)` extracts the entire string without overhead. This approach is $\mathcal{O}(n)$.
 """
 
 # ╔═╡ 1e0ef46a-1450-11eb-2676-d94d5cc1f073
@@ -215,6 +222,19 @@ end
 # ╔═╡ e6c2157e-f5d1-4240-8852-86a459ee9431
 md"""
 ### Memory Allocation
+
+You can observe some significant differences between following functions:
+
+!!! danger " f_alloc "
+	* `f_alloc` explicitly creates a new array `result = zeros(T, size(x))` to store intermediate results.
+	* Multiple reassignment operations on `result` with broadcasting. Each reassignment creates a new array due to the reassignment on the left side.
+	* The parameters `props` are passed as a generic `Vector{T}`, which involves array indexing each time.
+
+!!! tip "f_noalloc"
+	* `f_noalloc` uses a structured type `Props{T<:AbstractFloat}` to store parameters as typed fields, enabling compiler optimizations and avoiding abstract type overhead.
+	* The function uses `@views` to avoid copying slices of `y`.
+	* The whole expression is a single broadcasted operation with `.`, `.+`, and `.*` that composes a fused operation, optimized by Julia’s broadcasting machinery when applied together. This fusion avoids temporary arrays.
+
 """
 
 # ╔═╡ 41ef249a-1450-11eb-2c52-0930531fa46e
@@ -279,6 +299,13 @@ end
 # ╔═╡ cbf339be-d2f4-4aa1-968f-377e0c4ae16b
 md"""
 ### Changing variable type
+
+!!! danger "f_typechange"
+	In `f_typechange`, the variable `res` is initialized as an integer `0` by default. When summing elements `val` from the possibly floating-point array `x`, Julia must promote the type of `res` dynamically (e.g., from Int to Float) on the fly to accommodate the element types, leading to type instability and runtime overhead.
+
+!!! tip "f_notypechange"
+	In `f_notypechange`, the result variable `res` is initialized as `zero(T)`, creating a zero value exactly matching the element type of the array `x`. This makes the type of `res` stable and consistent throughout the loop, enabling Julia’s compiler to generate efficient, specialized machine code without type checks or runtime boxing/unboxing.
+
 """
 
 # ╔═╡ 6332ef7e-1450-11eb-0a36-41818207b78f
@@ -323,6 +350,11 @@ end
 # ╔═╡ c008820b-efad-4b93-a63c-3e5ffcbf4264
 md"""
 ### Vectorization
+
+!!! danger "f_norm"
+	`f_norm(x)` computes the expression `3x.^2 + 4x + 7x.^3` without broadcasting the entire expression at once. Julia interprets this as separate scalar operations with array exponentiation and multiplication. While the elementwise operations occur, Julia may create temporary arrays for each sub-expression (e.g., `x.^2`, `x.^3`) which results in multiple allocations and extra computation time.
+!!! tip "f_vec"
+	`f_vec(x)` uses the macro `@.` which applies broadcasting (elementwise operation) to the entire expression in a fused manner. The whole expression `3x.^2 + 4x + 7x.^3` is simultaneously broadcasted without generating intermediate temporary arrays. This reduces memory allocations and enables the compiler to generate faster and more efficient machine code.
 """
 
 # ╔═╡ 75948388-1450-11eb-0a0e-431ad5929504
@@ -355,7 +387,7 @@ end
 md"""
 ### Bringing it together
 * Preallocation
-* Threading
+* Multithreading
 * `@view` macro
 
 !!! info "Macros"
@@ -424,6 +456,11 @@ end
 # ╔═╡ 55578fed-d830-4362-b00b-5acefd8d4c30
 md"""
 ### Growing your array
+
+!!! danger "grow"
+	Each `push!` may trigger reallocation and copying as the array capacity needs to grow dynamically (often by doubling the size).
+!!! tip "nogrow"
+	Uses `similar(x)` to preallocate an array `res` of the exact size needed (length `N`).
 """
 
 # ╔═╡ b341b4d2-1450-11eb-0549-7db5bd6756ba
@@ -469,6 +506,12 @@ end
 # ╔═╡ e7a21dbb-e5a9-4eae-a384-3c65198867c9
 md"""
 ### Struct types
+
+| Struct Type             | Mutability | Field Typing   | Performance Characteristics                           |
+|------------------------|------------|----------------|-------------------------------------------------------|
+| `mystruct`             | Immutable  | Untyped fields | Fast creation, but less optimized than typed structs  |
+| `mytypedstruct{T}`     | Immutable  | Parametric typed | Fastest creation and access, best compiler optimization |
+| `mymutablestruct`      | Mutable    | Untyped fields | Slowest creation due to heap allocation and dynamic typing overhead |
 """
 
 # ╔═╡ c6702048-1450-11eb-1f1d-a54089545949

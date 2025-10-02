@@ -80,13 +80,26 @@ One of the simplest graph models is the Erdös-Rényi random graph model, denote
 The Erdös-Rényi random graph  exhibits a phase transition. Let us consider the size (i.e., number of nodes) of the largest connected component in the network as a function of the mean degree ⟨k⟩. When ⟨k⟩ = 0, the network is trivially composed of N disconnected nodes. In the other extreme of ⟨k⟩ = N − 1, each node pair is adjacent such that the network is trivially connected. Between the two extremes, the network does not change smoothly in terms of the largest component size. Instead, a giant component, i.e., a component whose size is the largest and proportional to N, suddenly appears as ⟨k⟩ increases, marking a phase transition. The goal of this application is to determine this value by simulation.
 
 ## Problem solution
-Resolve the problem and find the phase transition.
+Resolve the problem and find the phase transition. You can do this by implementing all characteristics yourself (as the largest connected component and the mean degree can be easily computed) or by using the [Graphs.jl](https://juliagraphs.org/Graphs.jl/v1.5/) package.
 !!! tip "Subproblems"
-	* generating a random graph
-	* determine the average degree
-	* identifying the size of the largest connected component
-	* visualising the result
-	* determine the critical value
+	1. Generating a random graph.
+		* Create a network of `N` nodes.
+		* For each pair of distinct nodes `(i,j)`, add an unirected edge with probability `p`.
+		* Ensure no self-loops are present.
+		* Store the graph efficiently as an adjacency matrix.
+	2. Determine the average degree
+		* Compute the degree `k_i` for each node.
+		* Compute the average degree.
+	3. Identifying the size of the largest connected component.
+		* Find all connected components in the graph using an algorithm such as breadth-first search (BFS) or depth-first search (DFS).
+		* For each component, count the number of nodes it contains.
+		* Identify the largest connected component and record its size.
+	4. Visualising the result.
+		* Plot the size of the largest connected component as a function of ⟨k⟩.
+		* Use multiple simulations per value of `p` to ease out the stochastic effects.
+		* Visualize the emergence of the giant component and the phase transition.
+	5. Determine the critical value
+		* From the plot, identify the critical average degree `⟨k⟩_c` where the largest component rapidly grows from very small to a size comparable to `N`.
 
 """
 
