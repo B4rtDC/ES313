@@ -334,6 +334,19 @@ md"""
 
 """
 
+# ╔═╡ f195819d-4ca2-4f57-8fe9-17d0b57d477a
+md"""
+### Implementations
+Within Julia, the [`Optim`](https://github.com/JuliaNLSolvers/Optim.jl) package contains a lot of different optimisation routines.
+
+The package is very generic, and provides a unified interface:
+```julia
+optimize(f, x₀, Method())
+```
+where ```Method()``` indicates one of the available optimisation methods.
+
+"""
+
 # ╔═╡ 13707c2b-6eb9-4a5d-885e-39d48b3c9bae
 md"""
 ### Second-order methods
@@ -372,19 +385,6 @@ md"""
 
 
 
-
-"""
-
-# ╔═╡ f195819d-4ca2-4f57-8fe9-17d0b57d477a
-md"""
-### Implementations
-Within Julia, the [`Optim`](https://github.com/JuliaNLSolvers/Optim.jl) package contains a lot of different optimisation routines.
-
-The package is very generic, and provides a unified interface:
-```julia
-optimize(f, x₀, Method())
-```
-where ```Method()``` indicates one of the available optimisation methods.
 
 """
 
@@ -929,10 +929,10 @@ The problem is then to maximize $f$ subject to the given constraints.
 # ╔═╡ 12bfc573-4b38-499f-89c0-49e6ea70759f
 let
 	model = Model(GLPK.Optimizer)
-	@variable(model, 0 <= x1)
-	@variable(model, 0 <= x2)
-	@variable(model, 0 <= x3)
-	@variable(model, 0 <= x4)
+	@variable(model, 0 <= x1, Int)
+	@variable(model, 0 <= x2, Int)
+	@variable(model, 0 <= x3, Int)
+	@variable(model, 0 <= x4, Int)
 	@objective(model, Max, 6*x1 + 4*x2 + 7*x3 + 5*x4)
 	@constraint(model, con1,   x1 + 2*x2 +   x3 +  2*x4 <= 20)
 	@constraint(model, con2, 6*x1 + 5*x2 + 3*x3 +  2*x4 <= 100)
@@ -1888,7 +1888,7 @@ You can see in the code below, that the implementation is an almost direct copy 
 # ╔═╡ b949506d-936a-4c5b-8724-1a71e86b5397
 let
 	model = Model(Ipopt.Optimizer)
-	set_attribute(model, "print_level", 0) # to limit the solver's output
+	set_attribute(model, "print_level", 1) # to limit the solver's output
 	@variable(model, x₁ ≥ 0, start=2)
 	@variable(model, x₂ ≥ 0, start=0)
 	@NLobjective(model, Min, (x₁-1)^2+(x₂-2.5)^2)
@@ -2134,7 +2134,7 @@ md"""
 begin
 UCAP_dv_content = md"""
 	We can propose the following variables:
-	* ``x_{ij^b}``: daily flight hours that UCAV $i$ flies in sector $j$ from base $b$ (continuous and ``\ge 0``).
+	* ``x_{ij}^b``: daily flight hours that UCAV $i$ flies in sector $j$ from base $b$ (continuous and ``\ge 0``).
 	* ``u_i^b``: UCAV $i$ operates at base $b$ on a given day (binary).
 
 	Additionaly, we should also consider the following parameters:
@@ -2517,12 +2517,12 @@ md"""
 # ╟─ddac3c21-7ac9-4295-aeca-a8f460c1f3b1
 # ╠═27e916ea-958c-4df8-b861-b2674798cee9
 # ╟─7f3b10fe-8a8e-49ba-a468-a7fa0cb8c17d
-# ╠═19bc12c5-2d3c-46dc-bb9b-02efe0882295
+# ╟─19bc12c5-2d3c-46dc-bb9b-02efe0882295
 # ╟─3e7cdf87-e064-4746-abd3-8ca6a702a0fe
 # ╟─561c3509-a1d4-43f4-a1ba-a55dbdfb0620
 # ╟─a0c4e07f-504d-426e-8d9f-7a212855888f
-# ╟─13707c2b-6eb9-4a5d-885e-39d48b3c9bae
 # ╟─f195819d-4ca2-4f57-8fe9-17d0b57d477a
+# ╟─13707c2b-6eb9-4a5d-885e-39d48b3c9bae
 # ╟─0ea96b49-8bd4-49fe-834a-b93865f5541b
 # ╟─cec44eec-ac69-47ac-9ad3-bfb58fc0a0ec
 # ╠═b1144ca2-087c-4ba7-ae77-ae9b6073a642
@@ -2552,11 +2552,11 @@ md"""
 # ╟─1a29e47e-8495-4eca-95ea-971661fc615b
 # ╠═dc757906-2b34-4341-96ad-237a3cfcbfeb
 # ╟─b3fd0b39-ca17-49e5-adec-552a69e386f8
-# ╠═ce5cea4c-17a0-4c12-b2f0-3b2ba705954e
+# ╟─ce5cea4c-17a0-4c12-b2f0-3b2ba705954e
 # ╟─5819029f-796f-43ff-a079-5fa95b3fb011
 # ╟─c0d3cda6-2506-40be-8fa1-51c604d7f548
 # ╟─5ec1071f-cfaf-404a-a468-efd0f76d709e
-# ╠═c06bd9c8-f489-42a4-8a6d-162f4864ba19
+# ╟─c06bd9c8-f489-42a4-8a6d-162f4864ba19
 # ╟─b5c4010d-f373-4a5b-8e14-275fb45c5292
 # ╟─afb498db-dc05-49c3-baad-d4bca7d2cc27
 # ╟─3f38a7f9-d64a-4eca-8205-72cfee88bb4d
@@ -2568,7 +2568,7 @@ md"""
 # ╟─81955573-23b9-4af7-82bf-e6b21cdd36b7
 # ╟─053779d8-056b-46fe-bee8-c151132639c1
 # ╟─40833da5-cfcc-4fe1-bdeb-9a1aa4b34f57
-# ╠═e41e416c-f687-4493-9266-d107145b1f7e
+# ╟─e41e416c-f687-4493-9266-d107145b1f7e
 # ╟─5be46829-11b4-4705-b3f8-9bced947f307
 # ╟─9e17f334-cad1-4c62-8ab9-f23a4443057b
 # ╟─76d17e1b-1d1a-48f5-ab73-e07fdc884cce

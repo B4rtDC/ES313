@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.5
+# v0.20.13
 
 using Markdown
 using InteractiveUtils
@@ -190,9 +190,9 @@ md"""
 - 11 Sep
 - 18 Sep
 - 02 Oct
-- 03 Oct
+- 03 Oct => cancelled
 - 17 Oct
-- 23 Oct
+- 24 Oct
 - 31 Oct
 - 06 Nov
 
@@ -205,7 +205,7 @@ md"""
 - 26 Sep
 - 10 Oct
 - 16 Oct
-- 24 Oct
+- 23 Oct
 - 30 Oct
 - 07 Nov
 - 13 Nov
