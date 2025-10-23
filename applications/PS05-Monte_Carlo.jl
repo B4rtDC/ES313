@@ -565,11 +565,6 @@ begin
 	function log_prior(theta0, theta1, sigma)
 	    log_pdf_theta0 = logpdf(Normal(0, 20), theta0)
 	
-	    #alpha_dist = Uniform(-pi/2, pi/2)
-	    #tan_bijection = Bijectors.BijectorFunction(x -> tan(x), y -> atan(y))
-	
-	    #tan_alpha_dist = transformed(alpha_dist, tan_bijection)
-	
 	    log_pdf_theta1 = logpdf(Cauchy(0, 1), theta1)
 	
 	    base_dist = Cauchy(0,3)
