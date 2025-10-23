@@ -136,6 +136,23 @@ md"""
 ### Understanding the rules
 """
 
+# ╔═╡ eab8e8f9-8528-460c-bdee-94fcbbc49d8e
+"""
+	rules(p::String)
+
+Obtain the rules that are applicable for our problem. We read the entire file and for each line we obtain the current state, the neighbors and the future state. We also account for all the possible circular permutations that can occurs. 
+
+The function returns a nested dictionary: [current state] => Dict([neigbors] => [future state])
+"""
+function rules(p::String; debug=false)
+		d = Dict()
+		for rule in readlines(p)
+			addrule!(d, rule; debug)
+		end
+
+		return d
+end
+
 # ╔═╡ b1d05970-3660-434a-b4a6-38cf867a9a99
 """
 	addrule!(d::Dict, rule::String; debug=false)
@@ -158,23 +175,6 @@ function addrule!(d::Dict, rule::String; debug=false)
 	end
 
 	return (current_state, neighbors, next_state)
-end
-
-# ╔═╡ eab8e8f9-8528-460c-bdee-94fcbbc49d8e
-"""
-	rules(p::String)
-
-Obtain the rules that are applicable for our problem. We read the entire file and for each line we obtain the current state, the neighbors and the future state. We also account for all the possible circular permutations that can occurs. 
-
-The function returns a nested dictionary: [current state] => Dict([neigbors] => [future state])
-"""
-function rules(p::String; debug=false)
-		d = Dict()
-		for rule in readlines(p)
-			addrule!(d, rule; debug)
-		end
-
-		return d
 end
 
 # ╔═╡ 1a0c018d-63bf-4ef3-a13b-49c02af54a2e

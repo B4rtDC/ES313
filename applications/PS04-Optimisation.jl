@@ -137,7 +137,7 @@ optimize(f, lower, upper)
 Try to optimize $x^3 - 6x + x^2 +2$
 !!! info "Tasks"
 	* Compare the result between both methods (`Brent()` vs `GoldenSection()`).
-	* Intermediate results can be store by using the `store_trace=true` keyword argument. The type of the returned object is `Optim.UnivariateOptimizationResults`. The numerical value of each entry can be read by using `.value`.
+	* Intermediate results can be stored by using the `store_trace=true` keyword argument. The type of the returned object is `Optim.UnivariateOptimizationResults`. The numerical value of each entry can be read by using `.value`.
 	* Illustrate the evolution of the estimated optimum.
 """
 
@@ -370,7 +370,7 @@ Making way for the application of the simplex and interior point methods.
 	$A_{\textrm{eq}}$ is a $m\times n$ matrix, $\vec{b}_{\textrm{eq}}\in\mathbb R^{m}$,
 	$A_{\textrm{in}}$ is a $p\times n$ matrix and $\vec{b}_{\textrm{in}}\in\mathbb R^{p}$.
 
-Problems of this type are important in their own right, and they also arise a subproblems in methods for general constrained optimization such as sequential quadratic programming and interior-point methods.
+Problems of this type are important in their own right, and they also arise as subproblems in methods for general constrained optimization such as sequential quadratic programming and interior-point methods.
 
 !!! tip "Sequential Quadratic Programming"
 	Sequential Quadratic Programming (SQP) is an iterative method used to solve constrained nonlinear optimization problems by approximating the original problem at each iteration with a quadratic programming subproblem. This subproblem minimizes a quadratic model of the objective function subject to linearized constraints derived from the original nonlinear constraints. By solving this sequence of quadratic programs, SQP efficiently handles nonlinear objectives and constraints, converging towards an optimal solution while incorporating derivative information such as gradients and Hessians.
@@ -767,7 +767,7 @@ Suppose each worker receives extra pay for the amount of calls that have been tr
 begin
 	cost_c = Float64[]
 	commission = 20
-	for _ in 1:1000
+	for _ in 1:10000
 		let cout=cost_c
 			model = Model(GLPK.Optimizer)
 			appels = log.(rand.(B_u))
@@ -848,7 +848,7 @@ $(PlutoUI.LocalResource("./applications/img/network.png"))
 
 !!! info "We want to:"
 	1. Determine the maximal flow in the network
-	2. Be able to get a troughput of 35 from the source node to the sink node, whilst keeping the costs limited. Each link has a possible increase, with an associated cost (cf. table)
+	2. Be able to get a troughput of 35 from the source node (A) to the sink node (G), whilst keeping the costs limited. Each link has a possible increase, with an associated cost (cf. table)
 
 $(PlutoUI.LocalResource("./applications/img/networkcost.png"))
 """
@@ -968,7 +968,7 @@ This Julia script models and solves the Capacitated Vehicle Routing Problem (CVR
 
 # ╔═╡ Cell order:
 # ╟─543d9901-6bdc-4ca5-bfac-800f543c3490
-# ╟─c175a542-11d4-49f1-a872-2053d81d5ade
+# ╠═c175a542-11d4-49f1-a872-2053d81d5ade
 # ╟─72ad677c-738f-4e62-afcb-c5260ff9a79e
 # ╟─b4764948-0330-11eb-3669-974d75ab1134
 # ╟─1b769f0c-0332-11eb-1efb-178c1985f3df

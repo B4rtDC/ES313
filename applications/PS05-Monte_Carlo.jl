@@ -27,6 +27,7 @@ begin
 	using ConcurrentSim
 	using Logging
 	using PlutoUI
+	PlutoUI.TableOfContents()
 end
 
 # ╔═╡ ce6d0508-8283-11f0-2bcb-9b53de934eb4
@@ -52,7 +53,7 @@ As you will have discovered during the lectures, the term *Monte Carlo* covers a
 
 	The core idea is to define a domain of inputs, randomly generate samples from that domain according to a probability distribution, perform computations on these samples, and then aggregate the results to approximate quantities such as integrals, expectations, or probabilities.
 
-	By relying on the law of large numbers, Monte Carlo approximations improve in accuracy as the number of random samples increases. These methods are widely used in numerical integration, optimization, and probabilistic modeling where analytical solutions are infeasible or complex.
+	By relying on the law of large numbers, Monte Carlo approximations improve in accuracy as the number of random samples increases.
 """
 
 # ╔═╡ fc76551d-d553-4c69-a3e2-81b599671e80
@@ -165,7 +166,7 @@ One frequently used method of modeling stock prices, is with the [**Black-Schole
 
 Thus, the properties of the [**Geometric Brownian Motion (GBM)**](https://en.wikipedia.org/wiki/Geometric_Brownian_motion) can be used to simulate the stock prices. These prices are assumed to evolve continuously, with random fluctuations capturing market uncertainty. The GBM model defines that the logarithmic returns of the stock price follow a normal distribution, leading to the stock price itself following a lognormal distribution over time.
 
-This leads to  For this application we will consider European options with a fixed interest and volatility. We will cover two approaches:
+For this application we will consider European options with a fixed interest and volatility. We will cover two approaches:
 * Through MC simulation
 * Through mathematical derivation
 
@@ -540,7 +541,7 @@ end
 
 # ╔═╡ 5b617b5d-723a-4292-90be-71dc34284801
 md"""
-We apply the Metropolis-Hastings sampling approach (as seen during the lectures) to sample from the distributions of $\boldsymbol{y}$ and $\sigma$
+We apply the Metropolis-Hastings sampling approach (as seen during the lectures) to sample from the distributions of $\boldsymbol{y}$ and $\sigma$. A great example to the practical implementation of MH-sampling (and other methods) can be found [here](https://chi-feng.github.io/mcmc-demo/app.html?algorithm=RandomWalkMH&target=banana).
 """
 
 # ╔═╡ 4329f67a-861a-4893-a9c3-ca3c7a99e04b
@@ -761,6 +762,23 @@ let
 	plot(plt, size=(1000,800))
 end
 
+# ╔═╡ a0139976-10d5-4525-aa42-ae6103dbb362
+md"""
+## Estimating ``\pi``
+
+During the lectures you saw this statement:
+
+!!! info
+	Another way of estimating $\pi$ is dropping point in a square, and analyse the number of points that fall within the inscribed circle.
+
+!!! tip
+	You can implement this very easily.
+	1. Run the MC simulation.
+	2. Make a figure representing your simulation.
+	3. Show the result.
+
+"""
+
 # ╔═╡ Cell order:
 # ╟─ce6d0508-8283-11f0-2bcb-9b53de934eb4
 # ╟─bb35ea5b-7629-4831-9c21-0658d0979cee
@@ -791,3 +809,4 @@ end
 # ╠═10ede4a2-1703-4c27-801d-c7502a88997d
 # ╠═20856d2f-b26e-4c7e-a283-8dbb53af7b9c
 # ╠═9cedbe14-a962-46fd-b271-e6ca78930e38
+# ╟─a0139976-10d5-4525-aa42-ae6103dbb362
