@@ -723,7 +723,7 @@ Managing the electricity grid is a major challenge.
 # ╟─fc0426fc-d2b6-4751-9c48-ecf31a7b5a3b
 # ╟─a795cad3-33a6-4664-a4b4-52b083ed4308
 # ╟─abd51e4f-6e18-461a-9882-a79a405bc1e2
-# ╠═07965656-a4fe-449c-898b-2fed7e755c42
+# ╟─07965656-a4fe-449c-898b-2fed7e755c42
 # ╟─69a9e78f-1150-4914-9772-d8feedd13fd0
 # ╟─94c57b2d-24c1-45d6-aba4-77aefd4da9bf
 # ╟─5126163e-0f60-4712-97fd-5a085af91744

@@ -34,16 +34,20 @@ You manage a sandwich shop. You want to investigate if adding an extra crew memb
 
 ## Some background information
 * The arrival time between clients $\left(T\right)$ is a stochastic variable following an exponential distribution with parameter $\lambda(t)$, where $\lambda$ depends on the time of day $t$. From historical data we know the following about the mean time between client arrivals:
-    * 00:00-08:00: shop is closed
-    * 08:00-11:00: 25 minutes
-    * 11:00-14:00: 1 minutes
-    * 14:00-17:00: 10 minutes
-    * 17:00-19:00: 2 minutes
-    * 19:00-20:00: 5 minutes
-    * 20:00-24:00: shop is closed
+| Time       | $\lambda$       |
+|:-----------|:----------------|
+| 00:00-08:00| shop is closed  |
+| 08:00-11:00| 25 minutes      |
+| 11:00-14:00| 1 minute        |
+| 14:00-17:00| 10 minutes      |
+| 17:00-19:00| 2 minutes       |
+| 19:00-20:00| 5 minutes       |
+| 20:00-24:00| shop is closed  |
+
     
 
-    **Remark**: in reality you would execute a measurements campaign and verify if the experimental distribution actually follows an exponential distribution (by means of a Kolmogorov–Smirnov test).
+!!! warning "Remark"
+	In reality you would execute a measurements campaign and verify if the experimental distribution actually follows an exponential distribution (by means of a Kolmogorov–Smirnov test).
         
 * If an employee is available, the client places an order (we could also incorporate a decision time). This implies that we need the shop to have a limited `::Resource` i.e. the employees. 
 * If no one is available, the client waits for his turn, but has a limited amount of patience. When this runs out, the client leaves the shop (and should thus cancel his request for the employee `::Resource`). Patience for the different clients is defined as a random variable $\sim\mathcal{U}(5,10)$. 
@@ -655,7 +659,7 @@ md"""
 # ╟─b0e1d068-160e-11eb-1362-01c43074510b
 # ╠═8d8a51fc-1777-11eb-0690-8575e369cdc9
 # ╟─86eab698-1777-11eb-209f-cb2b5eb01c3b
-# ╠═1bbd3af4-1776-11eb-0226-91212c01c89b
+# ╟─1bbd3af4-1776-11eb-0226-91212c01c89b
 # ╟─9833c350-1776-11eb-108f-e197d9e465df
 # ╟─77b5ac42-1776-11eb-23b0-936d3918e053
 # ╟─abb70132-1776-11eb-298c-bf23946166b2

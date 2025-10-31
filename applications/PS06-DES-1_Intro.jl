@@ -202,7 +202,7 @@ md"""
 !!! tip "Tasks"
 	Using a resumable function, try to implement:
 	1. [The pascal triangle](https://en.wikipedia.org/wiki/Pascal%27s_triangle): each iteration should return a line of the Pascal triangle.
-	2. A root finding method (e.g. square root of a number)
+	2. A root finding method (e.g. square root of a number: $\sqrt{x}$)
 
 *Note*: a resumable function returns an iterator you need to call.
 
@@ -512,7 +512,7 @@ md"""
 # ╠═19b12fc6-1464-11eb-2fc1-cbb3f82479c5
 # ╠═fec37932-89b5-4cd2-a472-aea8c07856a4
 # ╠═e3eae0ce-1462-11eb-2e02-fd2f746569d1
-# ╠═dd63ff16-146d-11eb-059c-0586e1f972a5
+# ╟─dd63ff16-146d-11eb-059c-0586e1f972a5
 # ╠═010af16a-1474-11eb-10dc-292a149988f1
 # ╟─c2b96732-ffb1-41d8-9d3e-be4527c2641d
 # ╠═363eba24-1474-11eb-26b8-718eed4e5f21
