@@ -36,7 +36,7 @@ begin
 	using Plots
 	using Printf   # for fancy text rendering
 	using Random
-	using LinearAlgebra
+	using LinearAlgebra: norm
 	using Statistics
 end
 
@@ -387,7 +387,7 @@ end
 
 # ╔═╡ 248569af-646b-464f-8026-5d20800a8c54
 md"""
-### Graph representations in Julia
+## Graph representations in Julia
 
 The `Graphs.jl` package stores graphs as graph objects, but we can move between common representations:
 * an edge list is compact and easy to write down;
@@ -635,7 +635,7 @@ let
 				   ylabel="number of nodes", title="Erdos-Renyi")
 	p2 = histogram(degree(G_ba), bins=0:maximum(degree(G_ba)), label="", xlabel="degree",
 				   ylabel="number of nodes", title="Barabasi-Albert")
-	plot(p1, p2, size=(800, 350))
+	plot(p1, p2, size=(800, 350), bottom_margin=3mm, left_margin=3mm)
 end
 
 # ╔═╡ ad23fe31-c3a1-4537-8613-f40e9aefddf5
@@ -793,9 +793,9 @@ md"""Evolution over time:"""
 
 # ╔═╡ 65a3f3c7-af4b-4998-a5f7-067b1bef14cc
 begin
-	S,I,R, states = sir_network(G, 0.2, 0.2, 30, 1)
+	S, infected, R, states = sir_network(G, 0.2, 0.2, 30, 1)
 	plot(S,label="Susceptible",linetype=:steppost)
-	plot!(I, label="Infected",linetype=:steppost)
+	plot!(infected, label="Infected",linetype=:steppost)
 	plot!(R, label="Recovered",linetype=:steppost)
 	xlabel!("Iteration")
 	ylabel!("Counts")
@@ -906,7 +906,7 @@ begin
 	infected_mean = vec(mean(infected_counts, dims=2) )
 
 	# illustration
-	scatter( (0:max_vaccination) ./ nv(GG) , infected_mean ./ nv(GG), xlabel="Proportion of vaccinated people", ylabel="Peak infection level\n[proportion of population]", ylims=(0, 0.04), label="", xlims=(0, 0.75), alpha=0.5, title="Vaccination based on betweenness similarity")
+	scatter( (0:max_vaccination) ./ nv(GG) , infected_mean ./ nv(GG), xlabel="Proportion of vaccinated people", ylabel="Peak infection level\n[proportion of population]", label="", xlims=(0, 0.75), alpha=0.5, title="Vaccination based on betweenness similarity") 
 end
 
 # ╔═╡ Cell order:
@@ -928,7 +928,7 @@ end
 # ╟─248569af-646b-464f-8026-5d20800a8c54
 # ╠═5aaa5580-e58f-4b06-8429-5bc40500de3a
 # ╟─1b303b0a-b9e7-453f-b2aa-2e395fd37619
-# ╟─295b1f30-641a-4941-863d-854acd2a27c7
+# ╠═295b1f30-641a-4941-863d-854acd2a27c7
 # ╠═491f1d2c-1a2f-4033-a5ae-64445f135184
 # ╟─a94dfec9-4f6d-4ac1-b639-4f3403e0fb7f
 # ╠═efeabf7f-5509-465c-ae31-d007ee12f005
@@ -936,7 +936,7 @@ end
 # ╟─3098c8fe-4ba7-4290-ae2f-118d9e50fa9d
 # ╟─04b96931-2140-42d5-8e93-0ebd9e835e91
 # ╟─556daa75-47ca-4e71-abac-4610ec9cf8b8
-# ╠═2d287e2f-a5fa-44b3-981b-ca4876893de8
+# ╟─2d287e2f-a5fa-44b3-981b-ca4876893de8
 # ╟─ad23fe31-c3a1-4537-8613-f40e9aefddf5
 # ╟─071809df-ba36-4e88-b958-b3ca160e04f0
 # ╟─6b93d24f-eefd-488c-b181-61aaec36c506
@@ -952,4 +952,4 @@ end
 # ╟─c8be9549-f8de-4a07-8d4f-6cd51a0d45f0
 # ╟─24dbd835-d044-40ff-bef1-380745f8266c
 # ╟─c6cc5a17-6775-4df5-8d6b-a1646ad69a25
-# ╟─b562447b-7350-4c30-82cd-66dd410852af
+# ╠═b562447b-7350-4c30-82cd-66dd410852af
