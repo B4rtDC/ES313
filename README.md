@@ -11,4 +11,4 @@ The course environment is pinned to Julia v1.10.x. On personal Windows, MacOS an
 ## Getting started
 Follow the [setup instructions](/setup/readme.md) (only required once).
 
-Assuming the setup went well, you can start by running the `start.jl` script in the `setup` folder. This will start a Pluto server, activate the course's environment, and open a new webpage.
+Assuming the setup went well, you can start by running the `start.jl` script in the `setup` folder with `-t auto` so Julia uses as many threads as your hardware exposes. This will start a Pluto server, activate the course's environment, and open a new webpage.

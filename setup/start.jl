@@ -9,6 +9,7 @@ Pkg.activate(joinpath(@__DIR__, ".."))
 # change to the root directory of the course
 cd(joinpath(@__DIR__, ".."))
 
+# Set threads at Julia startup, for example: `julia +1.10 -t auto setup/start.jl`.
 # start Pluto
 using Pluto
 Pluto.run()

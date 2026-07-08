@@ -107,15 +107,15 @@ Some lectures may get updates during the semester. If you have followed the inst
 
     For your own sanity, the most straightforward way that will allow you to stay synced and at the same time have your own file to work in, is to rename the notebook and maybe move it in a working directory from within Pluto as soon as you open it for the first time.
 ### Doing some work (run when you want to work)
-1. Run the script to start the Pluto notebook. This will automatically start the notebook server using its default settings, which should open a new tab in your browser. If no window opens, you can always copy the explicit link from the REPL.
+1. Run the script to start the Pluto notebook. Use `-t auto` so Julia starts with as many threads as your hardware exposes. This will automatically start the notebook server using its default settings, which should open a new tab in your browser. If no window opens, you can always copy the explicit link from the REPL.
     ```powershell
-    & "C:\Program Files\Julia-1.10\bin\julia.exe" "C:\path\to\folder name with a space\ES313\setup\start.jl" # on CDN Windows
+    & "C:\Program Files\Julia-1.10\bin\julia.exe" -t auto "C:\path\to\folder name with a space\ES313\setup\start.jl" # on CDN Windows
     ```
     ```powershell
-    julia +1.10 "C:\path\to\folder name with a space\ES313\setup\start.jl" # on a personal Windows computer
+    julia +1.10 -t auto "C:\path\to\folder name with a space\ES313\setup\start.jl" # on a personal Windows computer
     ```
     ```bash
-    julia +1.10 path/to/ES313/setup/start.jl # on Mac/Linux
+    julia +1.10 -t auto path/to/ES313/setup/start.jl # on Mac/Linux
     ```
 2. By default the present working directory is changed to the one for this course, this means that you can open every single notebook simply by using a relative path e.g. `./Exercises/PS01 - Visualisation.jl` or `./Lectures/Lecture00.jl`. After typing `./`, you can even use the tab key for autocomplete.
 
