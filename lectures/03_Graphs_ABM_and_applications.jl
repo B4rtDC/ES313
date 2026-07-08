@@ -64,7 +64,7 @@ md"""
 
 Examples:
 * A virtual ant colony, where each ant has simple instructions such as following pheromone trails when foraging. Although no explicit information is given related to pathfinding, organically, "ant highways" will arise.
-* Traffic flows can also be studied in this framework: by imposing simple rules on accelaration, decelaration, and overtaking, realistic traffic jams will start to appear in the simulation.
+* Traffic flows can also be studied in this framework: by imposing simple rules on acceleration, deceleration, and overtaking, realistic traffic jams will start to appear in the simulation.
 
 """
 
@@ -330,10 +330,10 @@ There even exists an entire Julia package focussing entirely on Agent Based Mode
 
 # ╔═╡ 42bc0402-149f-11f0-22d3-295f5dfa2ca9
 md"""# Networks and graphs
-Many real-world systems can be represented as (potentially different) entities that are connected in some way to one another. We often call this a network. Examples include social networks, transportation networks, computer networks, biological networks.
+Many real-world systems can be represented as entities that are connected in some way to one another. We often call this real-world structure a network. Examples include social networks, transportation networks, computer networks, biological networks, energy grids and supply chains.
 
 !!! info "Network"
-	While often used interchangeably with "graph", it typically refers to a real-world system of interacting entities
+	While often used interchangeably with "graph", it typically refers to a real-world system of interacting entities.
     
 
 !!! info "Graph"
@@ -342,8 +342,12 @@ Many real-world systems can be represented as (potentially different) entities t
 	Notation: ``G = (V, E)`` where ``V`` is the set of vertices and ``E`` is the set of edges.
 
 Graphs basics:
-* A graph can also be represented by its adjacency matrix ``A``, where a non-zero value ``a_{ij}`` represents that a connection from node ``i`` to ``j`` is present (note how this implies that a graph can be directional). 
-* Edges can also have weights (typically positive weights, altough negative weighted graphs are definined, but handling these is not straightforward)
+* A graph can be undirected (connections work both ways) or directed (connections have an orientation).
+* A graph can be unweighted (an edge is present or absent) or weighted (edges carry a cost, distance, capacity, similarity, probability, ...).
+* A graph can also be represented by its adjacency matrix ``A``, where a non-zero value ``a_{ij}`` represents that a connection from node ``i`` to ``j`` is present.
+* For weighted graphs, the value ``a_{ij}`` is the edge weight. Most shortest-path algorithms assume non-negative weights. Negative weights are mathematically possible, but need different algorithms and more care.
+
+The modelling choice matters: in a road network, edge weights may be travel time; in a friendship network, an edge may simply mean "knows"; in an infection network, an edge can mean "can transmit".
 
 Some examples:
 """
@@ -381,6 +385,30 @@ let
 	
 end
 
+# ╔═╡ 248569af-646b-464f-8026-5d20800a8c54
+md"""
+### Graph representations in Julia
+
+The `Graphs.jl` package stores graphs as graph objects, but we can move between common representations:
+* an edge list is compact and easy to write down;
+* an adjacency matrix is useful for linear-algebra-style reasoning;
+* a graph object is usually the most convenient form for algorithms.
+"""
+
+# ╔═╡ 5aaa5580-e58f-4b06-8429-5bc40500de3a
+let
+	edge_list = Edge.([(1, 2), (1, 3), (2, 4), (3, 4), (4, 5)])
+	G = SimpleGraphFromIterator(edge_list)
+	A = adjacency_matrix(G)
+	@info "edge list" collect(edges(G))
+	@info "adjacency matrix" Matrix(A)
+	@info "basic size" vertices=nv(G) edges=ne(G) density=Graphs.density(G)
+
+	gplot(G, nodelabel=1:nv(G), background_color="white", plot_size=(8cm, 8cm),
+		  title="same graph, object representation",
+		  edgestrokec="black", nodefillc=colorant"rgba(50,50,250,0.4)")
+end
+
 # ╔═╡ 1b303b0a-b9e7-453f-b2aa-2e395fd37619
 md"""
 ## Graph metrics
@@ -395,7 +423,11 @@ Graph metrics are values we can compute on node, meso, or graph level that allow
         *   Out-degree, ``k_{out}``: number of edges pointing away from the node.
         *   Total degree: ``k = k_{in} + k_{out}``
 
+!!! note "Density"
+	The density of a graph is the fraction of possible edges that are present. Dense graphs have many connections; sparse graphs have relatively few. Many engineering networks are sparse: the number of edges grows roughly proportional to the number of nodes, not to ``n^2``.
 
+!!! note "Clustering"
+	Clustering measures how often neighbors of a node are also connected to each other. High clustering is typical in social networks: if two people both know the same person, they are more likely to know each other.
 
 """
 
@@ -422,6 +454,23 @@ let
 		 edgestrokec="black", nodefillc=colorant"rgba(50,50,250,0.4)", nodesize=node_size_in)
 end
 
+# ╔═╡ 491f1d2c-1a2f-4033-a5ae-64445f135184
+let
+	G = SimpleGraph(6)
+	for e in [(1, 2), (1, 3), (2, 3), (3, 4), (4, 5), (4, 6), (5, 6)]
+		add_edge!(G, e...)
+	end
+
+	node_clustering = local_clustering_coefficient(G)
+	@info "graph-level metrics" density=Graphs.density(G) global_clustering=global_clustering_coefficient(G)
+	@info "node-level clustering" node_clustering
+
+	gplot(G, nodelabel=1:nv(G), background_color="white", plot_size=(8cm, 8cm),
+		  title="local clustering",
+		  edgestrokec="black", nodefillc=colorant"rgba(50,50,250,0.4)",
+		  nodesize=1 .+ 4 .* node_clustering)
+end
+
 # ╔═╡ a94dfec9-4f6d-4ac1-b639-4f3403e0fb7f
 md"""
 !!! note "Path"
@@ -431,6 +480,8 @@ md"""
 	* A cycle is a path where the start and end vertices are the same .
 	* A simple path has no repeated vertices (except possibly the start and end in a cycle).
 	
+!!! note "Shortest path"
+	A shortest path is a path with minimum length or minimum total weight. For unweighted graphs, length is usually the number of edges. For weighted graphs, the interpretation of the weight matters: a large weight can mean high cost, long distance or low desirability depending on how the model was built.
 
 
 !!! note "Component"
@@ -441,6 +492,25 @@ md"""
 
 
 """
+
+# ╔═╡ efeabf7f-5509-465c-ae31-d007ee12f005
+let
+	Gw = SimpleWeightedGraph(5)
+	add_edge!(Gw, 1, 2, 2.0)
+	add_edge!(Gw, 1, 3, 8.0)
+	add_edge!(Gw, 2, 3, 1.0)
+	add_edge!(Gw, 2, 4, 5.0)
+	add_edge!(Gw, 3, 4, 1.0)
+	add_edge!(Gw, 4, 5, 3.0)
+
+	sp = dijkstra_shortest_paths(Gw, 1)
+	@info "shortest-path distances from node 1" sp.dists
+
+	gplot(Gw, nodelabel=1:nv(Gw), background_color="white", plot_size=(8cm, 8cm),
+		  title="weighted graph for shortest paths",
+		  edgestrokec="black", nodefillc=colorant"rgba(50,50,250,0.4)",
+		  edgelinewidth=[e.weight for e in edges(Gw)])
+end
 
 # ╔═╡ 571b3127-defa-410a-a3ac-0cb140df033b
 let
@@ -494,7 +564,14 @@ end
 
 # ╔═╡ 3098c8fe-4ba7-4290-ae2f-118d9e50fa9d
 md"""
-!!! note "Betweennes Centrality"
+!!! note "Centrality"
+	Centrality measures try to answer "which nodes matter most?", but each measure makes a different assumption about what "matters" means.
+
+	* Degree centrality: important nodes have many direct connections.
+	* Closeness centrality: important nodes are, on average, close to all other nodes.
+	* Betweenness centrality: important nodes sit on many shortest paths and can act as bridges.
+
+!!! note "Betweenness centrality"
 	Betweenness centrality measures the importance of a vertex (or edge) in a graph based on how often it lies on the shortest paths between pairs of other vertices. It quantifies the extent to which a vertex acts as a "bridge" in the network.
 
 	Formally, for a vertex `` v `` in a graph `` G = (V, E) `` the betweenness centrality `` C_B(v) `` is defined as:
@@ -504,7 +581,7 @@ md"""
 	```
 	where `` \sigma_{st} `` represents the total number of shortest paths from vertex `` s `` to vertex `` t ``, and ``\sigma_{st}(v) `` represents the  number of those shortest paths that pass through vertex ``v.`` The sum is taken over all pairs of vertices `` s, t \in V `` (excluding `` v ``).
 
-	- High betweenness centrality indicates a vertex is critical for connecting different parts of the graph. When evaluating node importance using this metric, you implicitely assume that the shortest path will be used to travel between nodes, which is not necessarily true in all applications.
+	- High betweenness centrality indicates a vertex is critical for connecting different parts of the graph. When evaluating node importance using this metric, you implicitly assume that the shortest path will be used to travel between nodes, which is not necessarily true in all applications.
 	- It applies to both undirected and directed graphs, and can be computed for edges as well.
 	- For disconnected, directed graphs: betweenness only reflects intra-component paths, ignoring the broader network. This can lead to a situation where high betweenness in one component might dwarf scores in another. Misinterpreting betweenness without considering connectivity could lead to overlooking key nodes or bottlenecks in specific subnetworks.
 """
@@ -523,27 +600,49 @@ end
 # ╔═╡ 556daa75-47ca-4e71-abac-4610ec9cf8b8
 md"""
 ## Graph models
-There are many approaches to building a network, and some of these models are detailed below
+There are many approaches to building a network. The correct model depends on which real-world mechanism you want to represent.
+
+!!! tip "Erdos-Renyi model"
+	Underlying principle: every possible edge is independently present with probability ``p``. This is a useful baseline, but it usually does not reproduce hubs or community structure very well.
+
 !!! tip "Barabási–Albert model"
-	Underlying principle: grow the network through preferential attachment, i.e. a new node always has $m$ neighbors. The neigbors are chosen at random, but proportional to the node's degree
+	Underlying principle: grow the network through preferential attachment, i.e. a new node always has ``m`` neighbors. The neighbors are chosen at random, but proportional to the node's degree
 	```math
 	p_i = \frac{d_i}{\sum_j d_j}
 	```
 
-	It can be shown that the degree distribution of such a network follows a power law with coeffient ``\alpha = 3``
+	It can be shown that the degree distribution of such a network follows a power law with coefficient ``\alpha = 3``.
 
 	This network model has been used to explain real world processes and model the internet.
+
+!!! tip "Stochastic block model"
+	Underlying principle: nodes belong to groups, and the probability of an edge depends on the groups of the two nodes. This is a natural model for communities or modules.
+
+!!! tip "Configuration model"
+	Underlying principle: preserve a desired degree sequence and randomize the wiring. This is useful when you want to compare an observed network to a random network with the same node degrees.
 
 Illustration of the Barabási–Albert model ([source](https://networksciencebook.com/chapter/5#growth)):
 $(LocalResource("./lectures/img/barabasi_albert_growth.jpg"))
 
 """
 
+# ╔═╡ 2d287e2f-a5fa-44b3-981b-ca4876893de8
+let
+	G_er = erdos_renyi(80, 0.06, seed=161)
+	G_ba = barabasi_albert(80, 2, seed=161)
+
+	p1 = histogram(degree(G_er), bins=0:maximum(degree(G_er)), label="", xlabel="degree",
+				   ylabel="number of nodes", title="Erdos-Renyi")
+	p2 = histogram(degree(G_ba), bins=0:maximum(degree(G_ba)), label="", xlabel="degree",
+				   ylabel="number of nodes", title="Barabasi-Albert")
+	plot(p1, p2, size=(800, 350))
+end
+
 # ╔═╡ ad23fe31-c3a1-4537-8613-f40e9aefddf5
 md"""
 While we will not go into detail on the theoretical aspect of the power law, we can try to confirm it through an experiment.
 
-Our starting hypothesis is that the degree distribution of out Barabási–Albert graph follows a power law, i.e. ``p(x=k) = C x^{-\alpha}``
+Our starting hypothesis is that the degree distribution of our Barabási–Albert graph follows a power law, i.e. ``p(x=k) = C x^{-\alpha}``
 
 
 In the example below, we proceed as follows:
@@ -554,7 +653,7 @@ In the example below, we proceed as follows:
 
 # ╔═╡ 071809df-ba36-4e88-b958-b3ca160e04f0
 let
-	G = barabasi_albert(200000, 2)
+	G = barabasi_albert(20000, 2)
 	d = degree(G)
 	# finding the scale-free property
 	sorted_d = sort(d)
@@ -566,8 +665,8 @@ let
 		push!(P_greater_d, sum(unique_d .> x) / n_d)
 	end
 	
-	# fit regression type x^(-\alpha) line for durations larger than 10^2
-    mask = unique_d[1:end-1] .> 100
+	# fit regression type x^(-alpha) line for degrees larger than 20
+    mask = unique_d[1:end-1] .> 20
     x_fit = unique_d[1:end-1][mask]
     y_fit = P_greater_d[mask]
     # Simple linear regression in log-log space: log(y) = -α * log(x) + c
@@ -577,26 +676,15 @@ let
 	
 	scatter(unique_d[1:end-1], P_greater_d, xscale=:log10, yscale=:log10, label="ccdf(degree)")
 	plot!(x_fit, 10 .^(b[2] .* log10.(x_fit) .+ b[1]), color=:blue, alpha=0.5, label=@sprintf("power law fit (α = %.2f)",-(b[2]-1)), legendposition=:bottomleft)
-	ylims!(1e-5, 1e-3)
+	ylims!(1e-5, 1e-2)
 	xlabel!("degree")
 	ylabel!("P(D<d)")
-	title!("barabasi-albert network\n(200,000 nodes, 2 preferential attachments)")
+	title!("barabasi-albert network\n(20,000 nodes, 2 preferential attachments)")
 end
 
 # ╔═╡ 6b93d24f-eefd-488c-b181-61aaec36c506
 md"""
-
-!!! tip "Erdős-Rényi model"
-	Underlying principle: we have a network of size ``n``, every possible edge in the network is either present or not with a probability ``p``.
-
-	*Note: there is also a version where the number of nodes and the number of edges is fixed.*
-
-!!! tip "Configuration model"
-	This random graph model that allows to create a graph that hase the same degree sequence as an observed graph. In practice this is done by switching edges.
-
-	*Note: there is a risk of having the same edge occur twice, or having a self-edge.*
-
-There are many other graph models (such as the [stochastic block model](https://en.wikipedia.org/wiki/Stochastic_block_model) used below), and many extensions exist for directed and weighted graphs.
+The graph model is not a neutral technical detail. It encodes assumptions about how interactions are created. In a simulation study, it is often useful to compare results across several graph models: if your conclusion only appears for one very specific network generator, that conclusion may be a property of the generator rather than of the system being studied.
 """
 
 # ╔═╡ 378ceb57-6639-4e3c-b9e3-886df99ff735
@@ -652,12 +740,13 @@ end
 
 # ╔═╡ 3a45995d-ce17-4264-b2f5-631f00231421
 @doc raw"""
-	sir_network(g, β::Float64, γ::Float64, steps::Int, patient_zero::Int,states = fill('S', n) )
+	sir_network(g, β::Float64, γ::Float64, steps::Int, patient_zero::Int, states = fill('S', nv(g)) )
 
 Models a SIR infection process on a graph `g` for a number of `steps`, starting with a single `patient_zero`. The parameters ``\beta`` and ``\gamma`` represent the infection and recovery probabilities respectively. The function returns a count vector at each time step for each of the states. By default, all nodes start susceptible (except for patient zero).
 """
-function sir_network(g, β::Float64, γ::Float64, steps::Int, patient_zero::Int, states = fill('S', nv(g)) )
+function sir_network(g, β::Float64, γ::Float64, steps::Int, patient_zero::Int, initial_states = fill('S', nv(g)) )
     n = nv(g)  					# Number of nodes
+	states = copy(initial_states)
 	states[patient_zero] = 'I' 	# patient zero is the only infected person
 	outstates = fill(' ', n, steps+1)
 	outstates[:, 1] .= states
@@ -836,13 +925,18 @@ end
 # ╟─42bc0402-149f-11f0-22d3-295f5dfa2ca9
 # ╟─d01f1f2e-af33-417f-b6cc-894d95f56c15
 # ╟─44b81a7f-a7b7-4a2f-8c55-3c495cb5a9cc
+# ╟─248569af-646b-464f-8026-5d20800a8c54
+# ╠═5aaa5580-e58f-4b06-8429-5bc40500de3a
 # ╟─1b303b0a-b9e7-453f-b2aa-2e395fd37619
 # ╟─295b1f30-641a-4941-863d-854acd2a27c7
+# ╠═491f1d2c-1a2f-4033-a5ae-64445f135184
 # ╟─a94dfec9-4f6d-4ac1-b639-4f3403e0fb7f
+# ╠═efeabf7f-5509-465c-ae31-d007ee12f005
 # ╟─571b3127-defa-410a-a3ac-0cb140df033b
 # ╟─3098c8fe-4ba7-4290-ae2f-118d9e50fa9d
 # ╟─04b96931-2140-42d5-8e93-0ebd9e835e91
 # ╟─556daa75-47ca-4e71-abac-4610ec9cf8b8
+# ╠═2d287e2f-a5fa-44b3-981b-ca4876893de8
 # ╟─ad23fe31-c3a1-4537-8613-f40e9aefddf5
 # ╟─071809df-ba36-4e88-b958-b3ca160e04f0
 # ╟─6b93d24f-eefd-488c-b181-61aaec36c506
@@ -856,6 +950,6 @@ end
 # ╟─22bca145-f783-48e2-b83f-4d3d9842a5fc
 # ╟─748fca52-aad0-4411-a510-b080a1a24c67
 # ╟─c8be9549-f8de-4a07-8d4f-6cd51a0d45f0
-# ╠═24dbd835-d044-40ff-bef1-380745f8266c
+# ╟─24dbd835-d044-40ff-bef1-380745f8266c
 # ╟─c6cc5a17-6775-4df5-8d6b-a1646ad69a25
-# ╠═b562447b-7350-4c30-82cd-66dd410852af
+# ╟─b562447b-7350-4c30-82cd-66dd410852af
