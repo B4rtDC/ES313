@@ -35,6 +35,8 @@ begin
 using NativeSVG # SVG plotting library
 using Plots    # for random related activities
 using Printf   # for fancy text rendering
+using Random   # reproducible random experiments
+using Statistics
 end
 
 # ╔═╡ a62f8ca0-4680-4a73-8333-8c56b385839f
@@ -56,7 +58,7 @@ md"""# Physical Modelling
 Port of [Think Complexity chapter 7](http://greenteapress.com/complexity2/html/index.html) by Allen Downey.
 
 
-!!! info "Phyiscal modelling"
+!!! info "Physical modelling"
 	The process of creating a representation or simulation of a physical system or phenomenon using mathematical equations, computational techniques, or tangible objects. 
 
 ``\Rightarrow`` this is a way to understand, predict, or analyze how something behaves in the real world by mimicking its properties and interactions.
@@ -68,7 +70,28 @@ Different physical processes can be modelled using cellular automata, especially
 	
 	*The whole is greater than the sum of its parts*
 
-We will have a look at different applications, where we use will use cellular automata.
+We will have a look at different applications where cellular automata are useful physical models.
+"""
+
+# ╔═╡ 737c3da8-15ce-4f05-8c6b-c1eae0998630
+md"""## From Pattern to Model
+
+The examples below are visually interesting, but the modelling question is always more precise:
+
+| Model | State variable | Local mechanism | Observable |
+|:---|:---|:---|:---|
+| diffusion | concentration | flow from high to low concentration | total mass, roughness |
+| reaction-diffusion | two concentrations | diffusion, reaction, feed, removal | pattern contrast, total amounts |
+| percolation | open/closed and wet/dry cells | connectivity through local neighbors | percolation probability |
+| sand pile | local slope | threshold toppling | avalanche size and duration |
+
+This gives us a modelling cycle:
+
+1. choose a state representation;
+2. state the local update rule;
+3. decide what is held fixed at the boundary;
+4. simulate;
+5. measure an observable and compare it across parameter values.
 """
 
 # ╔═╡ 2abf49e0-f663-11ea-25f3-2f9229de732e
@@ -140,7 +163,7 @@ end
 	Diffusion
 
 A struct used to hold and instantiate a diffusion process. 
-Initialy, everyting is set to zero except for a square of ones in the center.
+Initially, everything is set to zero except for a square of ones in the center.
 """
 mutable struct Diffusion
 	array::Array{Float64, 2}
@@ -178,6 +201,47 @@ let
 	visualizearray(diffusion2.array, 30)
 end
 
+# ╔═╡ 98df4f0f-2b67-4e4d-b967-f8f151af4976
+md"""### Measuring Diffusion
+
+Diffusion is more than a smoothing animation. Two useful observables are:
+
+- **mass**: the total amount of chemical in the grid;
+- **roughness**: the variance of the concentration field.
+
+In a closed system, diffusion conserves mass. In this implementation the boundary is fixed at zero, so it acts like an absorbing edge: chemical can effectively leave the modelled region. That boundary choice is part of the model.
+"""
+
+# ╔═╡ 03f96645-e314-46bb-bc12-28b1fb0b600e
+"""
+	diffusion_observables(; steps=60, r=0.1)
+
+Run the diffusion model and return total mass and concentration variance over time.
+"""
+function diffusion_observables(; steps::Int=60, r::Float64=0.1)
+	model = Diffusion()
+	time = collect(0:steps)
+	mass = Float64[]
+	roughness = Float64[]
+	for step in time
+		interior = model.array[2:end-1, 2:end-1]
+		push!(mass, sum(model.array))
+		push!(roughness, var(vec(interior)))
+		step == steps && break
+		model.array = applydiffusion(model.array, r)
+	end
+	
+	return (; time, mass, roughness)
+end
+
+# ╔═╡ 0768d49b-1e26-4cec-b370-4ffd8d44dba2
+let
+	stats = diffusion_observables(steps=80, r=0.1)
+	p1 = plot(stats.time, stats.mass, xlabel="Step", ylabel="Total mass", label="", marker=:circle)
+	p2 = plot(stats.time, stats.roughness, xlabel="Step", ylabel="Variance", label="", marker=:circle)
+	plot(p1, p2, layout=(1, 2), size=(900, 320))
+end
+
 # ╔═╡ c03905f2-f667-11ea-3484-b111f7c14f60
 md"""## Reaction-Diffusion
 We now consider a more elaborate situation:
@@ -187,7 +251,7 @@ We now consider a more elaborate situation:
 	A 2-dimensional CA, where we  have two chemicals: ``a`` and ``b``. This system is subject to the following principles:
 	* we have ``a`` and ``b`` type cells. Each cell holds a continuous quantity (usually between 0 and 1) that represents the concentration of the specific chemical.
 	* both are subject to a diffusion process, which is modelled by comparing each cell with the average of its neighbors (same as before), using a specific diffusion rate for each chemical: ``r_a`` and ``r_b``.
-	* both interact through a chemical reaction proces, where it is assumed that the reactions consumes ``a`` and produces ``b``, so this contribution will be negative for ``a`` and positive for ``b`` as follows: ``ab^2``
+	* both interact through a chemical reaction process, where it is assumed that the reaction consumes ``a`` and produces ``b``, so this contribution will be negative for ``a`` and positive for ``b`` as follows: ``ab^2``
 	* we add ``a`` to the system in such a way that the feed rate is maximal when the quantity of ``a`` is near zero: ``f  (1 - a)``
 	* we remove ``b`` from the system in such a way that the removal rate is minimal when ``b`` is close to zero: ``(f + k) b`` 
 
@@ -198,7 +262,7 @@ As long as the rate parameters are not too high, the values of A and B usually s
 """
 	applyreactiondiffusion(a::Array, b::Array, ra::Float64=0.5, rb::Float64=0.25, f::Float64=0.055, k::Float64=0.062)
 
-Apply the reaction diffustion model for a situation with two chemicals, of which the concentrations are stored in `a` and `b` respectively.
+Apply the reaction-diffusion model for a situation with two chemicals, of which the concentrations are stored in `a` and `b` respectively.
 
 # Parameters:
 - `ra`: The diffusion rate of ``a`` (analogous to `r` in the previous section).
@@ -206,7 +270,7 @@ Apply the reaction diffustion model for a situation with two chemicals, of which
 - `f`: The “feed” rate, which controls how quickly A is added to the system.
 - `k`: The “kill” rate, which controls how quickly B is removed from the system.
 
-*Note*: `ca` and `ca` are the result of applying a diffusion to ``a`` and ``b``. Multiplying by `ra` and `rb` yields the rate of diffusion into or out of each cell.
+*Note*: `ca` and `cb` are the result of applying a diffusion to ``a`` and ``b``. Multiplying by `ra` and `rb` yields the rate of diffusion into or out of each cell.
 """
 function applyreactiondiffusion(
         a::Array{Float64, 2}, 
@@ -272,12 +336,65 @@ end
 # ╔═╡ 1734b35e-f66a-11ea-10b4-317d12008809
 md"""Since 1952, observations and experiments have provided some support for Turing’s conjecture. At this point it seems likely, but not yet proven, that many animal patterns are actually formed by reaction-diffusion processes of some kind."""
 
+# ╔═╡ ba90d318-34b9-47ec-981e-5e733d855da2
+md"""### Measuring Reaction-Diffusion
+
+Compared with pure diffusion, this model has sources and sinks:
+
+- the feed term adds chemical ``A``;
+- the kill term removes chemical ``B``;
+- the reaction converts ``A`` into ``B``.
+
+So the total amount of material is not conserved. A useful additional observable is the variance of ``B``: when spots or stripes develop, the field becomes more contrasted.
+"""
+
+# ╔═╡ 610cdf02-ddf4-4c4e-84db-9bfe998cb553
+"""
+	reactiondiffusion_observables(; n=80, steps=200, every=10, f=0.039, k=0.065, seed=2025)
+
+Run a smaller seeded Gray-Scott experiment and collect aggregate diagnostics.
+"""
+function reactiondiffusion_observables(; n::Int=80, steps::Int=200, every::Int=10, f::Float64=0.039, k::Float64=0.065, seed::Int=2025)
+	rng = MersenneTwister(seed)
+	a = ones(Float64, n, n)
+	b = rand(rng, Float64, n, n) .* 0.1
+	center = n ÷ 2
+	radius = max(2, n ÷ 20)
+	b[center-radius:center+radius, center-radius:center+radius] .+= 0.1
+
+	time = Int[]
+	total_a = Float64[]
+	total_b = Float64[]
+	contrast_b = Float64[]
+	for step in 0:steps
+		if step % every == 0
+			push!(time, step)
+			push!(total_a, sum(a))
+			push!(total_b, sum(b))
+			push!(contrast_b, var(vec(b[2:end-1, 2:end-1])))
+		end
+		step == steps && break
+		a, b = applyreactiondiffusion(a, b, 0.5, 0.25, f, k)
+	end
+
+	return (; time, total_a, total_b, contrast_b)
+end
+
+# ╔═╡ d22ef684-9b40-43b7-bdcb-a67d71cd5f8a
+let
+	stats = reactiondiffusion_observables()
+	p1 = plot(stats.time, stats.total_a, xlabel="Step", ylabel="Total amount", label="A")
+	plot!(p1, stats.time, stats.total_b, label="B")
+	p2 = plot(stats.time, stats.contrast_b, xlabel="Step", ylabel="Variance of B", label="", marker=:circle)
+	plot(p1, p2, layout=(1, 2), size=(900, 320))
+end
+
 # ╔═╡ 40f84b2e-f66a-11ea-1dc7-3ded9e11af06
 md"""## Percolation
 !!! info "Percolation"
 	Percolation is a concept from physics and mathematics that describes how something (a fluid, information, or influence) spreads through a medium. 
 
-Some examples of percolation include include oil in rock formations, water in paper, hydrogen gas in micropores, but you could also consider coffee brewing.
+Some examples of percolation include oil in rock formations, water in paper, hydrogen gas in micropores, but you could also consider coffee brewing.
 
 **Note:** Percolation models are also used to study systems that are not literally percolation, including epidemics and networks (of electrical resistors).
 
@@ -292,6 +409,14 @@ Some examples of percolation include include oil in rock formations, water in pa
 We want to know the following related to this wall :
 1. What is the probability that a random array contains a percolating cluster (the CA has a “percolating cluster” if there is a path of wet cells from the top to the bottom row).
 2. How does that probability depend on `q`?
+"""
+
+# ╔═╡ 98caca4c-20db-4f19-ae8a-c0e6ff207148
+md"""### Percolation as Connectivity
+
+Percolation can also be read as a graph problem. Each porous cell is a node, and neighboring porous cells are connected by edges. A wall percolates when there is a connected path from the top row to the bottom row.
+
+This is why percolation is useful beyond fluids: it is a simple model for connected components in networks, epidemic reachability, electrical conduction, and failure propagation.
 """
 
 # ╔═╡ 7140fbf4-a30d-479a-a539-7f7c0a350bf4
@@ -381,17 +506,21 @@ Run a percolation process until convergence and subsequently count the number of
 `vis` can be used to toggle the visualisation.
 """
 function testpercolation(array::Array{Float64, 2}, vis=false)
-    numberwet = count(x->x==0.5, array[3:101, 2:101])
+	nr_y, nr_x = size(array)
+	active_rows = 2:nr_y-1
+	active_cols = 2:nr_x-1
+	bottom_row = nr_y-1
+    numberwet = count(x->x==0.5, array[active_rows, active_cols])
     while true
         array = applypercolation(array)
-        if count(x->x==0.5, array[101, 2:101]) > 0
+        if count(x->x==0.5, array[bottom_row, active_cols]) > 0
 			if vis
 				return true, visualizearray(array, 8) 
 			else
             	return true
 			end
         end
-        newnumberwet = count(x->x==0.5, array[3:101, 2:101])
+        newnumberwet = count(x->x==0.5, array[active_rows, active_cols])
         if numberwet == newnumberwet
             if vis
 				return false, visualizearray(array, 8)
@@ -424,12 +553,30 @@ end
 Estimate the percolation probability for a `Wall` of size `n`, initiated with a porous probability `q` based on `iters` estimates.
 """
 function estimateprob(;n=100, q=0.5, iters=100)
-    t = Bool[]
+    successes = 0
     for _ in 1:iters
         wall = Wall(n, q)
-        push!(t, testpercolation(wall.array))
+        successes += testpercolation(wall.array) ? 1 : 0
     end
-    count(x->x, t) / iters
+    successes / iters
+end
+
+# ╔═╡ c828c986-5f12-4dab-8aac-d18d34ae6086
+"""
+	estimateprob_stats(; n=100, q=0.5, iters=100)
+
+Estimate the percolation probability and an approximate Monte Carlo standard error.
+"""
+function estimateprob_stats(; n::Int=100, q::Float64=0.5, iters::Int=100)
+	successes = 0
+	for _ in 1:iters
+		wall = Wall(n, q)
+		successes += testpercolation(wall.array) ? 1 : 0
+	end
+	p = successes / iters
+	se = sqrt(p * (1 - p) / iters)
+	
+	return (; p, se, successes, iters)
 end
 
 # ╔═╡ dda2cd12-f66c-11ea-3f31-837c9a749b5c
@@ -445,12 +592,17 @@ We can use our ```estimateprob``` function to get an idea to what extent (and if
 begin
 	# Different q values
 	q_vals = collect(range(0.5, stop=0.7, length=20))
-	# Associated probabilities
-	p_prob = map(q -> estimateprob(q=q), q_vals)
+	# Associated probabilities and approximate Monte Carlo uncertainty
+	percolation_stats = map(q -> estimateprob_stats(q=q, iters=50), q_vals)
+	p_prob = [stat.p for stat in percolation_stats]
+	p_se = [stat.se for stat in percolation_stats]
 end
 
 # ╔═╡ 952f559a-46bc-40ec-9d1f-1841e2240615
-plot(q_vals, p_prob, marker=:circle, label="Percolation probability", xlabel="q")
+plot(q_vals, p_prob, ribbon=1.96 .* p_se, marker=:circle, label="estimated P(percolation)", xlabel="q", ylabel="Probability", ylim=(0, 1))
+
+# ╔═╡ 258e9da9-dec2-47fc-b943-8bb3ff5aee05
+md"""The shaded band is an approximate 95% Monte Carlo interval. It reminds us that the curve is not a deterministic function evaluation: each point is estimated from a finite number of random walls."""
 
 # ╔═╡ 2a945f8f-26c8-4c8e-8632-e7cad95fc621
 md"""
@@ -467,7 +619,7 @@ The rapid change in behavior around `q=0.58` is called a phase change, by analog
 # ╔═╡ 340521e8-8c97-4c7d-85b9-93a37ee85563
 md"""
 ### Estimating a critical value for `q`
-We now know that a phase change is happening, but you might want to find a value ``q_{\text{crit}}``, such that the percolation probability is above a desired treshold ``P_{\text{crit}}``. 
+We now know that a phase change is happening, but you might want to find a value ``q_{\text{crit}}``, such that the percolation probability is above a desired threshold ``P_{\text{crit}}``. 
 
 This can be done in different ways. For example, you could use a bisection method (cf. numerical methods from last year). In the following, we will use a random walk to realise this.
 
@@ -484,7 +636,7 @@ Applied on our problem, we can do this as follows:
 
 # ╔═╡ d9fc2ec3-b3c3-41b3-8510-b599a1e8e059
 """
-	findcritical(;n::Int=100, iters::Int=100, P_crit::Float64=0.7, q₀::Float64=0.5, δq::Float64=0.004,tol::Float64=0.02)
+	findcritical(;n::Int=100, iters::Int=100, P_crit::Float64=0.7, q₀::Float64=0.5, δq::Float64=0.004,tol::Float64=0.02, maxiter::Int=100)
 
 Determine the required value of `q` to match the required percolation probability `P_crit`. 
 
@@ -495,22 +647,27 @@ Determine the required value of `q` to match the required percolation probabilit
 - q₀::Float=0.5: the inital value for the random walk
 - δq::Float=0.004: the update step for the q-value
 - tol::Float64=0.02: tolerance to stop computation
+- maxiter::Int=100: maximum number of probability estimates
 """
-function findcritical(;n::Int=100, iters::Int=100, P_crit::Float64=0.7, q₀::Float64=0.5, δq::Float64=0.004, tol::Float64=0.02)
+function findcritical(;n::Int=100, iters::Int=100, P_crit::Float64=0.7, q₀::Float64=0.5, δq::Float64=0.004, tol::Float64=0.02, maxiter::Int=100)
 	# initialise the values
 	qs = [q₀]
 	ps = Float64[]
 	# run the optimisation
-	while true
+	while length(ps) < maxiter
 		# compute the associated probability
 		p = estimateprob(;n=n, q=qs[end], iters=iters)
 		push!(ps, p)
 		if abs(p - P_crit) < tol
 			break
 		elseif p > P_crit
-			push!(qs, qs[end] - δq)
+			next_q = clamp(qs[end] - δq, 0.0, 1.0)
+			next_q == qs[end] && break
+			push!(qs, next_q)
 		elseif p < P_crit
-			push!(qs, qs[end] + δq)
+			next_q = clamp(qs[end] + δq, 0.0, 1.0)
+			next_q == qs[end] && break
+			push!(qs, next_q)
 		end
 	end
 
@@ -523,6 +680,14 @@ qs, ps = findcritical(q₀=0.58)
 
 # ╔═╡ 44719f1b-bcbd-4cc3-ab05-aa004f926f6c
 plot(ps, xlabel="Iteration", ylabel="P(percolation)",label="", marker=:circle)
+
+# ╔═╡ afd57d30-8a2c-45be-a2fe-091525f6b254
+md"""### Tuned Criticality and Self-Organized Criticality
+
+Percolation is a **tuned** critical system: we change `q` from the outside and observe a sharp transition around a critical value.
+
+The sand pile below is different. It is slowly driven by adding grains, and it dissipates at the boundary when avalanches reach the edge. After many drops, the system settles into a statistically steady state with avalanche distributions that can be very broad. This is the idea of **self-organized criticality**: the system moves toward a critical-like state without us tuning a parameter such as `q`.
+"""
 
 # ╔═╡ 0a76134a-e735-4184-ac41-674174132f8e
 md"""## Sand Piles
@@ -563,7 +728,7 @@ md"""
 """
 	applytoppling(array::Array{Int64, 2}, K::Int64=3)
 
-Given an `array` and a treshold value `K` above which the sand piles will topple, determine the new state.
+Given an `array` and a threshold value `K` above which the sand piles will topple, determine the new state.
 """
 function applytoppling(array::Array{Int64, 2}, K::Int64=3)
     out = copy(array)
@@ -617,7 +782,7 @@ end
 """
 	steptoppling(array::Array{Int64, 2}, K::Int64=3)
 
-Do a single toppling iteration for the `array` using treshold value `K` above which the sand piles will topple. I.e. this function will run untill no more changes in the state occur.
+Do a single toppling iteration for the `array` using threshold value `K` above which the sand piles will topple. I.e. this function will run until no more changes in the state occur.
 """
 function steptoppling(array::Array{Int64, 2}, K::Int64=3)
     total = 0
@@ -638,7 +803,7 @@ end
 	Pile
 
 A struct used to hold and instantiate a sand pile. 
-Initialy, everyting set to the value `initial`, except for the boundaries, which are set to zero.
+Initially, everything is set to the value `initial`, except for the boundaries, which are set to zero.
 """
 mutable struct Pile
 	array::Array{Int64, 2}
@@ -655,10 +820,10 @@ end
 
 Drop a new grain of sand on a random non-boundary element of the sand pile.
 """
-function drop(array::Array{Int64, 2})
+function drop(array::Array{Int64, 2}, rng::AbstractRNG=Random.default_rng())
     (ydim, xdim) = size(array)
-    y = rand(2:ydim-1)
-    x = rand(2:xdim-1)
+    y = rand(rng, 2:ydim-1)
+    x = rand(rng, 2:xdim-1)
     array[y,x] += 1
 	
     return array
@@ -686,7 +851,7 @@ end
 md"""### Example"""
 
 # ╔═╡ 39042d4a-d777-4e05-a857-dc8e55003d89
-md"""Construct and visualize a sand pile, with all values initiated at 10. This should lead to a square that hase the same value (10) in every cell."""
+md"""Construct and visualize a sand pile, with all values initiated at 10. This should lead to a square that has the same value (10) in every cell."""
 
 # ╔═╡ 26a1ddd2-67a3-498e-b653-43af7c9aeace
 begin
@@ -695,12 +860,12 @@ begin
 end
 
 # ╔═╡ bcaf050a-8da2-4dc1-99eb-90bc05f61386
-md"""Visualize the state after the toplling"""
+md"""Visualize the state after the toppling."""
 
 # ╔═╡ 9e666fb4-f6da-426b-b35f-587014f79814
 begin
 	pile20.array, steps, total = steptoppling(pile20.array);
-	@info "pile20 toppled in $(steps) steps and a total of $(total) topplings occured."
+	@info "pile20 toppled in $(steps) steps and a total of $(total) topplings occurred."
 	visualizepile(pile20.array, 30, 10)
 end
 
@@ -728,20 +893,24 @@ Recall from earlier that a heavy-tailed distribution is a distribution that has 
 >
 > We try to retrieve this relation for a sand pile with n=50 and an initial level of 30. 
 >
-> For 100,000 random drops, we run this until equilibrium
+> For a configurable number of random drops, we run this until equilibrium.
 > 
 
 
 
 """
 
+# ╔═╡ 7006688d-5e49-4d90-9aac-9608faf707a5
+@bind sandpile_trials Slider(2_000:2_000:20_000; default=8_000, show_value=true)
+
 # ╔═╡ c7872f6b-9c9f-4b2c-9dda-531c6edf5501
 begin
+	rng = MersenneTwister(2025)
 	pile50 = Pile(50, 30);
 	durations = Int64[]
 	avalanches = Int64[]	
-	for _ in 1:100000
-		pile50.array = drop(pile50.array)
+	for _ in 1:sandpile_trials
+		pile50.array = drop(pile50.array, rng)
 		pile50.array, steps, total = steptoppling(pile50.array)
 		push!(durations, steps)
 		push!(avalanches, total)
@@ -752,47 +921,63 @@ begin
 	nothing
 end
 
+# ╔═╡ 69f25cf7-7319-4d88-82f4-b43d86afa8f6
+begin
+	"""
+		complementary_cdf(values)
+	
+	Return points for the complementary cumulative distribution P(X > x).
+	"""
+	function complementary_cdf(values::Vector{Int64})
+		xs = sort(unique(values))
+		length(xs) <= 1 && return Int64[], Float64[]
+		xs = xs[1:end-1]
+		sorted_values = sort(values)
+		n = length(values)
+		ps = [sum(sorted_values .> x) / n for x in xs]
+		
+		return xs, ps
+	end
+
+	"""
+		fit_tail_powerlaw(xs, ps; xmin)
+	
+	Fit log10(P(X>x)) = intercept + slope * log10(x) for x >= xmin.
+	"""
+	function fit_tail_powerlaw(xs::Vector{Int64}, ps::Vector{Float64}; xmin::Real)
+		mask = (xs .>= xmin) .& (ps .> 0)
+		count(mask) < 2 && return (intercept=NaN, slope=NaN, alpha=NaN)
+		X = [ones(count(mask)) log10.(Float64.(xs[mask]))]
+		Y = log10.(ps[mask])
+		β = X \ Y
+		
+		return (intercept=β[1], slope=β[2], alpha=-β[2])
+	end
+
+	nothing
+end
+
 # ╔═╡ 9299334a-935e-461b-afea-5b6c3d094a46
 begin
 	# durations part
-	sorted_durations = sort(durations)
-	unique_durations = sort(unique(durations))
-	n_durations = length(durations)
-	P_greater_durations = Float64[]
-	for x in unique_durations[1:end-1]
-		push!(P_greater_durations, sum(sorted_durations .> x) / n_durations)
-	end
-	# fit regression type x^(-\alpha) line for durations larger than 10^2
-    mask = unique_durations[1:end-1] .> 250
-    x_fit = unique_durations[1:end-1][mask]
-    y_fit = P_greater_durations[mask]
-    # Simple linear regression in log-log space: log(y) = -α * log(x) + c
-	X = [log10.(x_fit) .^0 log10.(x_fit)]
-	Y = log10.(y_fit)
-	b = (X' * X) \  (X' * Y)
+	duration_xs, duration_ps = complementary_cdf(durations)
+	duration_xmin = isempty(duration_xs) ? 0 : max(2, round(Int, quantile(duration_xs, 0.75)))
+	duration_fit = fit_tail_powerlaw(duration_xs, duration_ps; xmin=duration_xmin)
 
 
 	# avalanches part
-	sorted_avalanches = sort(avalanches)
-	unique_avalanche = sort(unique(avalanches))
-	n_avalanches = length(avalanches)
-	P_greater_avalanche = Float64[]
-	for x in unique_avalanche[1:end-1]
-		push!(P_greater_avalanche, sum(sorted_avalanches .> x) / n_avalanches)
-	end
-	# fit regression type x^(-\alpha) line for durations larger than 10^3
-    mask = unique_avalanche[1:end-1] .> 5000
-    x_fit = unique_avalanche[1:end-1][mask]
-    y_fit = P_greater_avalanche[mask]
-    # Simple linear regression in log-log space: log(y) = -α * log(x) + c
-	X = [log10.(x_fit) .^0 log10.(x_fit)]
-	Y = log10.(y_fit)
-	bb = (X' * X) \  (X' * Y)
+	avalanche_xs, avalanche_ps = complementary_cdf(avalanches)
+	avalanche_xmin = isempty(avalanche_xs) ? 0 : max(2, round(Int, quantile(avalanche_xs, 0.75)))
+	avalanche_fit = fit_tail_powerlaw(avalanche_xs, avalanche_ps; xmin=avalanche_xmin)
 
-	scatter(unique_durations[1:end-1], P_greater_durations, xaxis=:log10, yaxis=:log10, label="durations", alpha=0.5)
-	plot!(unique_durations[1:end-1], 10 .^ (b[2] .* log10.(unique_durations[1:end-1]) .+ b[1]), color = :blue, label=@sprintf("power law fit (α: %.2f)", -b[2]), alpha =0.5)
-	scatter!(unique_avalanche[1:end-1], P_greater_avalanche, xaxis=:log10, yaxis=:log10, label="avalanche", alpha=0.5)
-	plot!(unique_avalanche[1:end-1], 10 .^ (bb[2] .* log10.(unique_avalanche[1:end-1]) .+ bb[1]), color = :green, label=@sprintf("power law fit (α: %.2f)", -bb[2]), alpha =0.5)
+	scatter(duration_xs, duration_ps, xaxis=:log10, yaxis=:log10, label="durations", alpha=0.5)
+	if isfinite(duration_fit.alpha)
+		plot!(duration_xs, 10 .^ (duration_fit.slope .* log10.(duration_xs) .+ duration_fit.intercept), color=:blue, label=@sprintf("duration tail α: %.2f", duration_fit.alpha), alpha=0.5)
+	end
+	scatter!(avalanche_xs, avalanche_ps, xaxis=:log10, yaxis=:log10, label="avalanche size", alpha=0.5)
+	if isfinite(avalanche_fit.alpha)
+		plot!(avalanche_xs, 10 .^ (avalanche_fit.slope .* log10.(avalanche_xs) .+ avalanche_fit.intercept), color=:green, label=@sprintf("avalanche tail α: %.2f", avalanche_fit.alpha), alpha=0.5)
+	end
 	plot!(legendposition=:bottomleft)
 	ylims!(1e-5,1)
 	xlabel!("Value")
@@ -800,6 +985,9 @@ begin
 
 	
 end
+
+# ╔═╡ b989e963-8fca-49d6-9f36-1ac6f24923f1
+md"""The fitted line is a diagnostic, not proof of a power law. Tail fits are sensitive to sample size, the chosen fitting range, and finite grid effects. The robust conclusion for this lecture is qualitative: avalanches are not all the same size, and rare large events matter."""
 
 # ╔═╡ 87c7816a-f66e-11ea-02fe-1752fee2c7eb
 md"""# Fractals
@@ -818,10 +1006,10 @@ For simple geometric objects, dimension is defined in terms of scaling behavior.
 > 
 > If the side of a cube has length `l`, its volume is `l^3`, which indicates that a cube is three-dimensional.
 
-When we say that some systems shows "fractal behavior", the dimension can be non-integer (hence the name). For cellullar automata, we can determine the "dimension" of a CA by using box counting:
+When we say that some systems show "fractal behavior", the dimension can be non-integer (hence the name). For cellular automata, we can determine the "dimension" of a CA by using box counting:
 
 !!! tip "Box counting for a CA"
-	In a simplified approach, you could obtain a quantitative measure of complexity by counting the number cell that are "on" after a certain number of time steps and link this to the size of the CA.
+	In a simplified approach, you could obtain a quantitative measure of complexity by counting the number of cells that are "on" after a certain number of time steps and link this to the size of the CA.
 
 """
 
@@ -871,7 +1059,7 @@ begin
 	"""
 		applyrule1dim(rule::BitArray{1}, state::BitArray{1})
 	
-	Return the new state based on the own states and the left and right neigbour.
+	Return the new state based on the own states and the left and right neighbour.
 	"""
 	function applyrule1dim(rule::BitArray{1}, state::BitArray{1})
 		# get position of the state in the rule in rule
@@ -1168,6 +1356,7 @@ end
 # ╟─a62f8ca0-4680-4a73-8333-8c56b385839f
 # ╠═f231418d-4bbc-46a1-bb65-5b1d14141b31
 # ╟─e6ff0e98-f662-11ea-03a7-e3d09e6272a6
+# ╟─737c3da8-15ce-4f05-8c6b-c1eae0998630
 # ╟─2abf49e0-f663-11ea-25f3-2f9229de732e
 # ╠═40373f12-f663-11ea-256c-abd1458a8e85
 # ╟─52f4e280-f663-11ea-38a4-c52a7b06b564
@@ -1179,6 +1368,9 @@ end
 # ╟─b25969c4-f665-11ea-222b-df9786a710d2
 # ╟─4c3d12f5-0606-4f7f-96f4-d687e7b59fa4
 # ╟─95dc78e8-f667-11ea-1c07-8f5cc11b011b
+# ╟─98df4f0f-2b67-4e4d-b967-f8f151af4976
+# ╠═03f96645-e314-46bb-bc12-28b1fb0b600e
+# ╠═0768d49b-1e26-4cec-b370-4ffd8d44dba2
 # ╟─c03905f2-f667-11ea-3484-b111f7c14f60
 # ╠═cf7c1a2c-f667-11ea-358f-df431ec27476
 # ╠═23f98030-f668-11ea-389b-ff911adaadfd
@@ -1187,7 +1379,11 @@ end
 # ╟─e1988846-f668-11ea-1b26-8f7dca1bb4e7
 # ╟─dda066c0-f668-11ea-3096-bdea16f40db7
 # ╟─1734b35e-f66a-11ea-10b4-317d12008809
+# ╟─ba90d318-34b9-47ec-981e-5e733d855da2
+# ╠═610cdf02-ddf4-4c4e-84db-9bfe998cb553
+# ╠═d22ef684-9b40-43b7-bdcb-a67d71cd5f8a
 # ╟─40f84b2e-f66a-11ea-1dc7-3ded9e11af06
+# ╟─98caca4c-20db-4f19-ae8a-c0e6ff207148
 # ╟─7140fbf4-a30d-479a-a539-7f7c0a350bf4
 # ╠═77dcd828-f66a-11ea-0942-c5d613d828b7
 # ╠═44c8b17a-f66b-11ea-39af-f554593e33eb
@@ -1200,15 +1396,18 @@ end
 # ╟─9fe496ab-7277-4c99-8533-6c329b82b563
 # ╠═c71f0f24-f66c-11ea-0ba7-d765f3998ed9
 # ╠═1254b21a-f66e-11ea-2b36-7985687edd02
+# ╠═c828c986-5f12-4dab-8aac-d18d34ae6086
 # ╠═dda2cd12-f66c-11ea-3f31-837c9a749b5c
 # ╟─a92e9fe7-1cf7-4426-8221-c3e4946f4860
 # ╠═2b6328b1-0384-4937-994b-ae8270824f42
 # ╟─952f559a-46bc-40ec-9d1f-1841e2240615
+# ╟─258e9da9-dec2-47fc-b943-8bb3ff5aee05
 # ╟─2a945f8f-26c8-4c8e-8632-e7cad95fc621
 # ╟─340521e8-8c97-4c7d-85b9-93a37ee85563
 # ╠═d9fc2ec3-b3c3-41b3-8510-b599a1e8e059
 # ╠═501878b4-f66e-11ea-270f-d7542715acbb
 # ╟─44719f1b-bcbd-4cc3-ab05-aa004f926f6c
+# ╟─afd57d30-8a2c-45be-a2fe-091525f6b254
 # ╟─0a76134a-e735-4184-ac41-674174132f8e
 # ╟─3af0633c-3c5d-45ba-b590-0a433cd008ab
 # ╠═dd7ef855-c9da-4984-a4d5-a7f81972027b
@@ -1226,8 +1425,11 @@ end
 # ╠═ade0a573-059f-4f12-8627-45ea734c65a2
 # ╟─b3505179-3861-46fc-b0fb-7fac96c95dd2
 # ╟─da9e17e4-9490-4927-87bc-99dce93b15aa
+# ╟─7006688d-5e49-4d90-9aac-9608faf707a5
 # ╠═c7872f6b-9c9f-4b2c-9dda-531c6edf5501
+# ╠═69f25cf7-7319-4d88-82f4-b43d86afa8f6
 # ╠═9299334a-935e-461b-afea-5b6c3d094a46
+# ╟─b989e963-8fca-49d6-9f36-1ac6f24923f1
 # ╟─87c7816a-f66e-11ea-02fe-1752fee2c7eb
 # ╟─862b7efd-3b8b-4f7b-921e-a5b43114f991
 # ╟─48f6cfc2-0659-45e9-ad44-bb87ec4024a9
