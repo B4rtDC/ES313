@@ -184,40 +184,42 @@ All notebooks can be found on [GitHub](https://github.com/B4rtDC/ES313). Additio
 # ╔═╡ e89bee34-39b8-4558-b7d5-6e9872e9ded4
 md"""
 ## Schedule (TBC)
+The schedule shown below is an indication. You should have your computer at any time.
 
 ### Theory
-- 03 Sep
+- 02 Sep
+- 04 Sep
 - 11 Sep
+- 16 Sep
 - 18 Sep
-- 02 Oct
-- 03 Oct => cancelled
-- 17 Oct
-- 24 Oct
-- 31 Oct
-- 06 Nov
+- 30 Sep
+- 07 Oct
+- 09 Oct
+- 04 Nov (assistant)
+- 06 Nov (assistant)
 
 
 ### Practice
-- 04 Sep
-- 12 Sep
-- 19 Sep
-- 25 Sep
-- 26 Sep
-- 10 Oct
-- 16 Oct
+- 23 Sep
+- 25 Sep (TBC if students available)
+- 02 Oct
+- 21 Oct
 - 23 Oct
+- 28 Oct
 - 30 Oct
-- 07 Nov
 - 13 Nov
-- 14 Nov
+
+### Blended learning / self study days
+- 14 Oct
+- 16 Oct
 
 
 ### Project timings
-
-- early November: list of projects available
-- no ex cathedra classes, but we are available during contact hours
-- 04+05 Dec: mandatory meeting: understanding of the problem
-- 18 + 19 Dec: mandatory meeting: progress
+- NLT early November: list of projects available
+- Starting Nov 18, course hours are scheduled for project work. During these periods, there are no ex cathedra classes, but we are available during contact hours (contact us beforehand)
+- 02 & 04 Dec: mandatory individual meeting - understanding of the problem
+- 16 & 18 Dec: mandatory individual meeting - progress evaluation
+- Jan: oral exam on the project work
 """
 
 # ╔═╡ cd6436f1-005a-495f-bc2b-fb519d0139dc
