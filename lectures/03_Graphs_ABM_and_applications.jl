@@ -793,9 +793,9 @@ md"""Evolution over time:"""
 
 # ╔═╡ 65a3f3c7-af4b-4998-a5f7-067b1bef14cc
 begin
-	S, infected, R, states = sir_network(G, 0.2, 0.2, 30, 1)
+	S, I, R, states = sir_network(G, 0.2, 0.2, 30, 1)
 	plot(S,label="Susceptible",linetype=:steppost)
-	plot!(infected, label="Infected",linetype=:steppost)
+	plot!(I, label="Infected",linetype=:steppost)
 	plot!(R, label="Recovered",linetype=:steppost)
 	xlabel!("Iteration")
 	ylabel!("Counts")
