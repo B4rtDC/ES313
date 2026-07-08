@@ -38,8 +38,11 @@ begin
 	using ConcurrentSim
 	using Logging
 
+	using BenchmarkTools
 	using Distributions
 	using Plots
+	using Random
+	using Statistics
 	using StatsPlots
 	using LaTeXStrings
 	using Measures            # For fine-grained plot control 
@@ -377,7 +380,7 @@ MM1_queue_simulation(interarrival_distribution, service_distribution, 10)
 
 # ╔═╡ 70143d09-77ec-4bd5-b621-ec638fbfb000
 let
-	t,n = MM1_queue_simulation(interarrival_distribution, service_distribution, 10)
+	t,n,_ = MM1_queue_simulation(interarrival_distribution, service_distribution, 10)
 	plot(t, n, line=:steppost, label="", xlabel="t", ylabel="N", marker=:circle, markeralpha=0.8, markerfill=:lightblue)
 end
 
@@ -464,6 +467,267 @@ let
 	#mean(wait), )
 end
 
+# ╔═╡ ea4bc5e1-3762-4df1-9ee5-ae5c56ee12ad
+Threads.nthreads()
+
+# ╔═╡ 3ddd4941-a578-4c1d-b42a-ed1e47e85f39
+md"""
+## Performance insight: making the M/M/1 simulation cheaper
+
+The process-driven simulation above is already much better than stepping through every small time interval. Still, the way we collect and process data can dominate runtime when we repeat the simulation many times.
+
+We will keep the same model and improve only the implementation details:
+1. keep the original trace and analyse it afterwards;
+2. use a local random-number generator and size hints for trace storage;
+3. compute summary statistics online instead of storing every event;
+4. preallocate many independent runs and dispatch them across threads.
+"""
+
+# ╔═╡ a874701c-f450-4016-bc37-46c7b7554dd0
+struct MM1Summary
+	mean_wait::Float64
+	time_average_n::Float64
+	served::Int
+	max_n::Int
+end
+
+# ╔═╡ 15e9aff1-695e-4178-885a-3306d0367ed2
+function summarize_trace(times::Vector{Float64}, output::Vector{Int}, wait_times::Vector{Float64}, max_time::Real)
+	t_end = Float64(max_time)
+	area_n = 0.0
+	for i in 1:(length(times)-1)
+		area_n += output[i] * (times[i+1] - times[i])
+	end
+	area_n += output[end] * max(t_end - times[end], 0.0)
+
+	mean_wait = isempty(wait_times) ? NaN : mean(wait_times)
+	return MM1Summary(mean_wait, area_n / t_end, length(wait_times), maximum(output))
+end
+
+# ╔═╡ be35839a-c05f-4f4e-ab6b-fbe1f28b68d1
+function MM1_trace_summary(interarrival_distribution::UnivariateDistribution, service_distribution::UnivariateDistribution, max_time::Real)
+	times, output, wait_times = MM1_queue_simulation(interarrival_distribution, service_distribution, max_time)
+	return summarize_trace(times, output, wait_times, max_time)
+end
+
+# ╔═╡ 19bdb483-7f93-4632-b94e-580886d2ced5
+md"""
+### Trace variant with local randomness and storage hints
+
+The original version uses the global random-number generator and lets arrays grow as needed. For one small run that is perfectly fine. For thousands of replications it is better to make random streams explicit and give trace arrays a reasonable initial capacity.
+"""
+
+# ╔═╡ 8cb648c4-07a5-4746-999a-cd6140cb83b6
+begin
+	@resumable function packet_generator_trace!(sim::Simulation,
+			rng::Random.AbstractRNG,
+			interarrival_distribution::UnivariateDistribution,
+			service_distribution::UnivariateDistribution,
+			times::Vector{Float64},
+			output::Vector{Int},
+			wait_times::Vector{Float64})
+		line = Resource(sim, 1)
+		while true
+			next_arrival_delay = rand(rng, interarrival_distribution)
+			@yield timeout(sim, next_arrival_delay)
+			@process packet_trace!(sim, rng, service_distribution, line, times, output, wait_times)
+		end
+	end
+
+	@resumable function packet_trace!(sim::Simulation,
+			rng::Random.AbstractRNG,
+			service_distribution::UnivariateDistribution,
+			line::Resource,
+			times::Vector{Float64},
+			output::Vector{Int},
+			wait_times::Vector{Float64})
+		time_in = now(sim)
+		push!(times, time_in)
+		push!(output, output[end] + 1)
+		@yield request(line)
+		push!(wait_times, now(sim) - time_in)
+		@yield timeout(sim, rand(rng, service_distribution))
+		push!(times, now(sim))
+		push!(output, output[end] - 1)
+		@yield release(line)
+	end
+
+	function MM1_queue_simulation_trace(interarrival_distribution::UnivariateDistribution,
+			service_distribution::UnivariateDistribution,
+			max_time::Real; seed::Int=161, max_events_hint::Int=10_000)
+		sim = Simulation()
+		rng = Random.MersenneTwister(seed)
+		times = Float64[now(sim)]
+		output = Int[0]
+		wait_times = Float64[]
+		sizehint!(times, max_events_hint)
+		sizehint!(output, max_events_hint)
+		sizehint!(wait_times, max_events_hint ÷ 2)
+		@process packet_generator_trace!(sim, rng, interarrival_distribution, service_distribution, times, output, wait_times)
+		run(sim, max_time)
+		return times, output, wait_times
+	end
+end
+
+# ╔═╡ 6b95be91-2b47-49cb-82ff-2a548ba0b023
+let
+	times, output, wait_times = MM1_queue_simulation_trace(interarrival_distribution, service_distribution, 100.0; seed=161)
+	summarize_trace(times, output, wait_times, 100.0)
+end
+
+# ╔═╡ ef46aded-d2ba-4a07-85e3-f2892f8048a7
+md"""
+### Online statistics
+
+If we only need aggregate indicators, storing the complete event trace is wasteful. We can update the time-average number of customers and the waiting-time sum while the simulation runs.
+"""
+
+# ╔═╡ 955a6862-34f0-45d4-999b-cf51b73290ec
+begin
+	mutable struct MM1Accumulator
+		last_time::Float64
+		n::Int
+		area_n::Float64
+		wait_sum::Float64
+		served::Int
+		max_n::Int
+	end
+
+	function observe_n!(acc::MM1Accumulator, time::Float64, new_n::Int)
+		acc.area_n += acc.n * (time - acc.last_time)
+		acc.last_time = time
+		acc.n = new_n
+		acc.max_n = max(acc.max_n, new_n)
+		return acc
+	end
+
+	function finish_summary(acc::MM1Accumulator, max_time::Real)
+		t_end = Float64(max_time)
+		area_n = acc.area_n + acc.n * max(t_end - acc.last_time, 0.0)
+		mean_wait = acc.served == 0 ? NaN : acc.wait_sum / acc.served
+		return MM1Summary(mean_wait, area_n / t_end, acc.served, acc.max_n)
+	end
+
+	@resumable function packet_generator_online!(sim::Simulation,
+			rng::Random.AbstractRNG,
+			interarrival_distribution::UnivariateDistribution,
+			service_distribution::UnivariateDistribution,
+			acc)
+		line = Resource(sim, 1)
+		while true
+			next_arrival_delay = rand(rng, interarrival_distribution)
+			@yield timeout(sim, next_arrival_delay)
+			@process packet_online!(sim, rng, service_distribution, line, acc)
+		end
+	end
+
+	@resumable function packet_online!(sim::Simulation,
+			rng::Random.AbstractRNG,
+			service_distribution::UnivariateDistribution,
+			line::Resource,
+			acc)
+		time_in = now(sim)
+		observe_n!(acc, time_in, acc.n + 1)
+		@yield request(line)
+		acc.wait_sum += now(sim) - time_in
+		acc.served += 1
+		@yield timeout(sim, rand(rng, service_distribution))
+		observe_n!(acc, now(sim), acc.n - 1)
+		@yield release(line)
+	end
+
+	function MM1_queue_summary(interarrival_distribution::UnivariateDistribution,
+			service_distribution::UnivariateDistribution,
+			max_time::Real; seed::Int=161)
+		sim = Simulation()
+		rng = Random.MersenneTwister(seed)
+		acc = MM1Accumulator(now(sim), 0, 0.0, 0.0, 0, 0)
+		@process packet_generator_online!(sim, rng, interarrival_distribution, service_distribution, acc)
+		run(sim, max_time)
+		return finish_summary(acc, max_time)
+	end
+end
+
+# ╔═╡ 9f7e106a-f7a1-4837-b354-b58dfe6711fa
+begin
+	function MM1_many_runs_serial(nruns::Int, max_time::Real; seed::Int=161)
+		summaries = Vector{MM1Summary}(undef, nruns)
+		for i in eachindex(summaries)
+			summaries[i] = MM1_queue_summary(interarrival_distribution, service_distribution, max_time; seed=seed+i)
+		end
+		return summaries
+	end
+
+	function MM1_many_runs_threaded(nruns::Int, max_time::Real; seed::Int=161)
+		summaries = Vector{MM1Summary}(undef, nruns)
+		Threads.@threads for i in eachindex(summaries)
+			summaries[i] = MM1_queue_summary(interarrival_distribution, service_distribution, max_time; seed=seed+i)
+		end
+		return summaries
+	end
+
+	function summarize_runs(summaries::Vector{MM1Summary})
+		return (
+			mean_wait = mean(s.mean_wait for s in summaries),
+			mean_time_average_n = mean(s.time_average_n for s in summaries),
+			total_served = sum(s.served for s in summaries),
+			max_n = maximum(s.max_n for s in summaries),
+		)
+	end
+end
+
+# ╔═╡ c056fe7c-c760-4c07-83c1-56c3f7cc4c9d
+let
+	summaries = MM1_many_runs_threaded(12, 250.0; seed=161)
+	summarize_runs(summaries)
+end
+
+# ╔═╡ f32a8c75-6f1c-4872-9d1f-59c71ea9f0ef
+md"""
+### Small benchmark comparison
+
+The exact speedups depend on your computer and on the number of Julia threads. The pattern to look for is more important than the absolute timing: avoid storing data you do not need, preallocate when the size is known, and parallelize independent replications.
+"""
+
+# ╔═╡ da95e3bf-3ba0-496b-bb0e-34cf3eab9a3f
+function benchmark_mm1_variants(; max_time::Float64=120.0, nruns::Int=4)
+	variants = [
+		("trace + posthoc", () -> MM1_trace_summary(interarrival_distribution, service_distribution, max_time)),
+		("local rng trace", () -> begin
+			times, output, wait_times = MM1_queue_simulation_trace(interarrival_distribution, service_distribution, max_time; seed=161)
+			summarize_trace(times, output, wait_times, max_time)
+		end),
+		("online summary", () -> MM1_queue_summary(interarrival_distribution, service_distribution, max_time; seed=161)),
+		("serial replications", () -> MM1_many_runs_serial(nruns, max_time; seed=161)),
+		("threaded replications", () -> MM1_many_runs_threaded(nruns, max_time; seed=161)),
+	]
+
+	names = String[]
+	times_ms = Float64[]
+	allocations = Int[]
+	memory_kib = Float64[]
+	for (name, f) in variants
+		trial = @benchmark $f() samples=3 evals=1 seconds=0.25
+		estimate = median(trial)
+		push!(names, name)
+		push!(times_ms, estimate.time / 1e6)
+		push!(allocations, estimate.allocs)
+		push!(memory_kib, estimate.memory / 1024)
+	end
+
+	baseline_time = first(times_ms)
+	return (
+		variant = names,
+		median_ms = round.(times_ms; digits=2),
+		allocations = allocations,
+		memory_kib = round.(memory_kib; digits=1),
+		speedup_vs_baseline = round.(baseline_time ./ times_ms; digits=2),
+	)
+end
+
+# ╔═╡ e2958e8e-a1b1-4f77-bb42-f3e62e9a77cc
+benchmark_mm1_variants()
+
 # ╔═╡ 1270f652-40b7-4088-b1a2-164decdf7f18
 md"""
 ## Considerations
@@ -536,5 +800,20 @@ The regenerative approach helps address the issue of autocorrelation in simulati
 # ╟─5b9c83fd-8031-450a-8217-d8c6d1f884a6
 # ╟─bfd5a133-004d-4889-b541-f40e05b51e54
 # ╟─8e02afc1-1471-4d03-9a37-2d82526e0e80
-# ╟─af159f28-a476-402f-9f96-123b2cbf5f8f
+# ╠═af159f28-a476-402f-9f96-123b2cbf5f8f
+# ╠═ea4bc5e1-3762-4df1-9ee5-ae5c56ee12ad
+# ╟─3ddd4941-a578-4c1d-b42a-ed1e47e85f39
+# ╠═a874701c-f450-4016-bc37-46c7b7554dd0
+# ╠═15e9aff1-695e-4178-885a-3306d0367ed2
+# ╠═be35839a-c05f-4f4e-ab6b-fbe1f28b68d1
+# ╟─19bdb483-7f93-4632-b94e-580886d2ced5
+# ╠═8cb648c4-07a5-4746-999a-cd6140cb83b6
+# ╠═6b95be91-2b47-49cb-82ff-2a548ba0b023
+# ╟─ef46aded-d2ba-4a07-85e3-f2892f8048a7
+# ╠═955a6862-34f0-45d4-999b-cf51b73290ec
+# ╠═9f7e106a-f7a1-4837-b354-b58dfe6711fa
+# ╠═c056fe7c-c760-4c07-83c1-56c3f7cc4c9d
+# ╟─f32a8c75-6f1c-4872-9d1f-59c71ea9f0ef
+# ╠═da95e3bf-3ba0-496b-bb0e-34cf3eab9a3f
+# ╠═e2958e8e-a1b1-4f77-bb42-f3e62e9a77cc
 # ╟─1270f652-40b7-4088-b1a2-164decdf7f18
