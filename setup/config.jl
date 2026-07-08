@@ -5,13 +5,15 @@
 const downloadfolder = joinpath(homedir(),"Documents")
 const git_path_windows = "C:\\Program Files\\Git\\bin\\git.exe"
 
-# set the proxy server setting if required (on CDN)
-#ENV["HTTP_PROXY"] = "http://CDNUSER:CDNPSW@dmzproxy005.idcn.mil.intra:8080"
 
 
 # ------------------------------------------------- #
 #            DO NOT CHANGE THIS                     #
 # ------------------------------------------------- #
+if VERSION.major != 1 || VERSION.minor != 10
+    error("ES313 is configured for Julia 1.10.x. On personal computers, install Juliaup and run this script with `julia +1.10 path/to/config.jl`. On the CDN Windows machine, use the Julia 1.10 executable. Current Julia version: $(VERSION)")
+end
+
 using Pkg
 
 !ispath(downloadfolder) ? mkdir(downloadfolder) : nothing
