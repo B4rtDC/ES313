@@ -39,6 +39,13 @@ using Random   # reproducible random experiments
 using Statistics
 end
 
+# ╔═╡ b83f22cd-e5c0-4ef5-9afe-bc5a604800c3
+begin
+	const PHYS_SEED = 208
+	# a fresh MersenneTwister per experiment keeps every stochastic figure reproducible
+	phys_rng(seed::Integer=PHYS_SEED) = MersenneTwister(seed)
+end
+
 # ╔═╡ a62f8ca0-4680-4a73-8333-8c56b385839f
 html"""
  <! -- this adapts the width of the cells to display its being used on -->
@@ -101,7 +108,7 @@ md"""## Diffusion
 	A 2-dimensional CA that adheres to the following principles:
 	* each cell holds a continuous quantity (usually between 0 and 1) that represents the concentration of the chemical.
 	* the diffusion process is modelled by comparing each cell with the average of its neighbors. If the concentration of the center cell exceeds the neighborhood average, the chemical flows from the center to the neighbors. If the concentration of the center cell is lower, the chemical flows the other way.
-	* a diffusion constant, ``r``, relates the difference in concentration to the rate of flow ``c``: ``\Delta = r \cdot c``
+	* a diffusion constant, ``r``, sets what fraction of the concentration difference ``c`` (the sum of the four neighbours minus ``4`` times the centre) flows each step: the update applied to the cell is ``r \cdot c``
 
 Example next state computation for the central cell in the grid:
 
@@ -350,12 +357,11 @@ So the total amount of material is not conserved. A useful additional observable
 
 # ╔═╡ 610cdf02-ddf4-4c4e-84db-9bfe998cb553
 """
-	reactiondiffusion_observables(; n=80, steps=200, every=10, f=0.039, k=0.065, seed=2025)
+	reactiondiffusion_observables(rng=phys_rng(250); n=80, steps=200, every=10, f=0.039, k=0.065)
 
 Run a smaller seeded Gray-Scott experiment and collect aggregate diagnostics.
 """
-function reactiondiffusion_observables(; n::Int=80, steps::Int=200, every::Int=10, f::Float64=0.039, k::Float64=0.065, seed::Int=2025)
-	rng = MersenneTwister(seed)
+function reactiondiffusion_observables(rng::AbstractRNG=phys_rng(250); n::Int=80, steps::Int=200, every::Int=10, f::Float64=0.039, k::Float64=0.065)
 	a = ones(Float64, n, n)
 	b = rand(rng, Float64, n, n) .* 0.1
 	center = n ÷ 2
@@ -404,7 +410,7 @@ Some examples of percolation include oil in rock formations, water in paper, hyd
 	* During each time step, if a porous cell has at least one wet neighbor, it becomes wet. Non-porous cells stay dry.
 	* The simulation runs until it reaches a “fixed point” where no more cells change state.
 	
-	*Note*: due to the way the water propagation is modelled, it can also move upwards. You might link artefact to the capillary action.
+	*Note*: due to the way the water propagation is modelled, it can also move upwards. You might link this artefact to capillary action.
 
 We want to know the following related to this wall :
 1. What is the probability that a random array contains a percolating cluster (the CA has a “percolating cluster” if there is a path of wet cells from the top to the bottom row).
@@ -456,14 +462,14 @@ A struct used for the percolation process that holds the array with the values.
 mutable struct Wall
 	array::Array{Float64, 2}
 	"""
-		Wall(n, q)
+		Wall(n, q, rng::AbstractRNG=Random.default_rng())
 
-	Generate a square `Wall` of size `n` x `n` with a probability `q` of being porous. The top row is initiated to be wet.
+	Generate a square `Wall` of size `n` x `n` with a probability `q` of being porous. The top row is initiated to be wet. Pass an `rng` for reproducible walls.
 	"""
-	function Wall(n, q)
+	function Wall(n, q, rng::AbstractRNG=Random.default_rng())
     	array = zeros(Float64, n+2, n+2)
 		array[2, 2:n+1] = ones(Float64, n)*0.5
-		array[3:n+1, 2:n+1] = rand(Float64, n-1, n)
+		array[3:n+1, 2:n+1] = rand(rng, Float64, n-1, n)
 		for y in 3:n+1
 			for x in 2:n+1
 				if array[y, x] < q
@@ -548,14 +554,14 @@ end
 
 # ╔═╡ 1254b21a-f66e-11ea-2b36-7985687edd02
 """
-	estimateprob(;n=100, q=0.5, iters=100)
+	estimateprob(rng::AbstractRNG=Random.default_rng(); n=100, q=0.5, iters=100)
 
 Estimate the percolation probability for a `Wall` of size `n`, initiated with a porous probability `q` based on `iters` estimates.
 """
-function estimateprob(;n=100, q=0.5, iters=100)
+function estimateprob(rng::AbstractRNG=Random.default_rng(); n=100, q=0.5, iters=100)
     successes = 0
     for _ in 1:iters
-        wall = Wall(n, q)
+        wall = Wall(n, q, rng)
         successes += testpercolation(wall.array) ? 1 : 0
     end
     successes / iters
@@ -563,14 +569,14 @@ end
 
 # ╔═╡ c828c986-5f12-4dab-8aac-d18d34ae6086
 """
-	estimateprob_stats(; n=100, q=0.5, iters=100)
+	estimateprob_stats(rng::AbstractRNG=Random.default_rng(); n=100, q=0.5, iters=100)
 
 Estimate the percolation probability and an approximate Monte Carlo standard error.
 """
-function estimateprob_stats(; n::Int=100, q::Float64=0.5, iters::Int=100)
+function estimateprob_stats(rng::AbstractRNG=Random.default_rng(); n::Int=100, q::Float64=0.5, iters::Int=100)
 	successes = 0
 	for _ in 1:iters
-		wall = Wall(n, q)
+		wall = Wall(n, q, rng)
 		successes += testpercolation(wall.array) ? 1 : 0
 	end
 	p = successes / iters
@@ -580,7 +586,7 @@ function estimateprob_stats(; n::Int=100, q::Float64=0.5, iters::Int=100)
 end
 
 # ╔═╡ dda2cd12-f66c-11ea-3f31-837c9a749b5c
-estimateprob(q = 0.60)
+estimateprob(phys_rng(200); q = 0.60)
 
 # ╔═╡ a92e9fe7-1cf7-4426-8221-c3e4946f4860
 md"""
@@ -592,8 +598,9 @@ We can use our ```estimateprob``` function to get an idea to what extent (and if
 begin
 	# Different q values
 	q_vals = collect(range(0.5, stop=0.7, length=20))
-	# Associated probabilities and approximate Monte Carlo uncertainty
-	percolation_stats = map(q -> estimateprob_stats(q=q, iters=50), q_vals)
+	# Associated probabilities and approximate Monte Carlo uncertainty.
+	# Each q gets its own seeded rng so the whole sweep is reproducible.
+	percolation_stats = [estimateprob_stats(phys_rng(300 + i); q=q, iters=50) for (i, q) in enumerate(q_vals)]
 	p_prob = [stat.p for stat in percolation_stats]
 	p_se = [stat.se for stat in percolation_stats]
 end
@@ -606,7 +613,7 @@ md"""The shaded band is an approximate 95% Monte Carlo interval. It reminds us t
 
 # ╔═╡ 2a945f8f-26c8-4c8e-8632-e7cad95fc621
 md"""
-The rapid change in behavior around `q=0.58` is called a phase change, by analogy with phase changes in physical systems, like the way water changes from liquid to solid at its freezing point.
+The rapid change in behavior around `q≈0.59` is called a phase change, by analogy with phase changes in physical systems, like the way water changes from liquid to solid at its freezing point.
 
 !!! info "Phase change"
 	A phase change, or phase transition, is when a system shifts from one distinct state of matter or organization to another. 
@@ -636,11 +643,12 @@ Applied on our problem, we can do this as follows:
 
 # ╔═╡ d9fc2ec3-b3c3-41b3-8510-b599a1e8e059
 """
-	findcritical(;n::Int=100, iters::Int=100, P_crit::Float64=0.7, q₀::Float64=0.5, δq::Float64=0.004,tol::Float64=0.02, maxiter::Int=100)
+	findcritical(rng::AbstractRNG=Random.default_rng(); n::Int=100, iters::Int=100, P_crit::Float64=0.7, q₀::Float64=0.5, δq::Float64=0.004,tol::Float64=0.02, maxiter::Int=100)
 
 Determine the required value of `q` to match the required percolation probability `P_crit`. 
 
 # Arguments
+- rng::AbstractRNG=Random.default_rng(): random source; pass `phys_rng(seed)` for reproducibility
 - n::Int=100: size of the wall
 - iters::Int=100 number of iterations for a single estimate of `P` (cf. ```estimateprob```)
 - P_crit::Float=0.7: the desired percolation probability
@@ -649,14 +657,14 @@ Determine the required value of `q` to match the required percolation probabilit
 - tol::Float64=0.02: tolerance to stop computation
 - maxiter::Int=100: maximum number of probability estimates
 """
-function findcritical(;n::Int=100, iters::Int=100, P_crit::Float64=0.7, q₀::Float64=0.5, δq::Float64=0.004, tol::Float64=0.02, maxiter::Int=100)
+function findcritical(rng::AbstractRNG=Random.default_rng(); n::Int=100, iters::Int=100, P_crit::Float64=0.7, q₀::Float64=0.5, δq::Float64=0.004, tol::Float64=0.02, maxiter::Int=100)
 	# initialise the values
 	qs = [q₀]
 	ps = Float64[]
 	# run the optimisation
 	while length(ps) < maxiter
 		# compute the associated probability
-		p = estimateprob(;n=n, q=qs[end], iters=iters)
+		p = estimateprob(rng; n=n, q=qs[end], iters=iters)
 		push!(ps, p)
 		if abs(p - P_crit) < tol
 			break
@@ -676,7 +684,7 @@ function findcritical(;n::Int=100, iters::Int=100, P_crit::Float64=0.7, q₀::Fl
 end
 
 # ╔═╡ 501878b4-f66e-11ea-270f-d7542715acbb
-qs, ps = findcritical(q₀=0.58)
+qs, ps = findcritical(phys_rng(400); q₀=0.58)
 
 # ╔═╡ 44719f1b-bcbd-4cc3-ab05-aa004f926f6c
 plot(ps, xlabel="Iteration", ylabel="P(percolation)",label="", marker=:circle)
@@ -759,7 +767,7 @@ end
 
 Make a graphical representation of the values in an `array`. `dim` is a scaling factor for the illustration. 
 
-The plot uses grayscale going from black (0) to white (1). The values in the `array` are rescaled by the factor `scale` to be between zero and one.
+The plot uses grayscale going from white (0) to black (scale). The values in the `array` are rescaled by the factor `scale` to be between zero and one.
 
 `dim` is a scaling factor for the illustration. 
 """
@@ -905,7 +913,7 @@ Recall from earlier that a heavy-tailed distribution is a distribution that has 
 
 # ╔═╡ c7872f6b-9c9f-4b2c-9dda-531c6edf5501
 begin
-	rng = MersenneTwister(2025)
+	rng = phys_rng(500)
 	pile50 = Pile(50, 30);
 	durations = Int64[]
 	avalanches = Int64[]	
@@ -1154,7 +1162,7 @@ md"""
 # ╔═╡ 73fd7b5e-f66f-11ea-12cd-dd36181cf956
 begin
 	n = 501;
-	fplot = plot(1:n, 1:n, xaxis=:log, yaxis=:log, label="d = 1", xlabel="Iteration", ylabel="Dimension")
+	fplot = plot(1:n, 1:n, xaxis=:log, yaxis=:log, label="d = 1", xlabel="Iteration", ylabel="Number of on cells")
 	plot!(fplot, 1:n, (1:n).^2, xaxis=:log, yaxis=:log, label="d = 2",legendposition=:topleft)
 	for rule in [20; 50; 18]
 		plot!(fplot, 1:n, countcells_wolfram(rule, n), xaxis=:log, yaxis=:log, label="rule $rule")
@@ -1172,7 +1180,7 @@ md"""## Fractals and percolation of water in a wall
 	* During each time step, if a porous cell has at least one wet neighbor, it becomes wet. Non-porous cells stay dry.
 	* The simulation runs until it reaches a “fixed point” where no more cells change state.
 	
-	*Note*: due to the way the water propagation is modelled, it can also move upwards. You might link artefact to the capillary action.
+	*Note*: due to the way the water propagation is modelled, it can also move upwards. You might link this artefact to capillary action.
 
 To estimate their fractal dimension, we can run CAs with a range of sizes, count the number of wet cells in each percolating cluster, and then see how the cell counts scale as we increase the size of the array."""
 
@@ -1211,12 +1219,13 @@ md"""The dots show the number of cells in each percolating cluster. The slope of
 let	
 	sizes = 10:10:200
 
-	pplot = plot(sizes, sizes, xaxis=:log, yaxis=:log, label="d = 1", xlabel="Iteration", ylabel="Dimension")
+	pplot = plot(sizes, sizes, xaxis=:log, yaxis=:log, label="d = 1", xlabel="Array size", ylabel="Number of wet cells")
 	plot!(pplot, sizes, (sizes).^2, xaxis=:log, yaxis=:log, label="d = 2")
-	for q in [0.4; 0.8; 0.596]
+	for (qi, q) in enumerate([0.4; 0.8; 0.596])
 		res = Float64[]
+		rng = phys_rng(600 + qi)
 		for size in sizes
-			wall = Wall(size, q)
+			wall = Wall(size, q, rng)
 			push!(res, countcells_percolation(wall.array))
 		end
 		plot!(pplot, sizes, res, xaxis=:log, yaxis=:log, seriestype=:scatter, label="q = $q")
@@ -1301,7 +1310,7 @@ md"""On a log-log scale, the cell counts form nearly straight lines, which indic
 let 
 	(ydim, xdim) = size(pile131.array)
 	m = Int((ydim-1)/2)
-	fp = plot(1:2:2*m-1, 1:2:2*m-1, xaxis=:log, yaxis=:log, label="d = 1",legend=:topleft, xlabel="Box size", ylabel="Dimension")
+	fp = plot(1:2:2*m-1, 1:2:2*m-1, xaxis=:log, yaxis=:log, label="d = 1",legend=:topleft, xlabel="Box size", ylabel="Number of cells")
 	plot!(fp,1:2:2*m-1, (1:2:2*m-1).^2, xaxis=:log, yaxis=:log, label="d = 2")
 	for level in [0;1;2;3]
 		res = filter(x->x>0, countcells_pile(pile131.array, level))
@@ -1355,6 +1364,7 @@ end
 # ╠═1d6260d4-f663-11ea-03da-efe9ed63f9bd
 # ╟─a62f8ca0-4680-4a73-8333-8c56b385839f
 # ╠═f231418d-4bbc-46a1-bb65-5b1d14141b31
+# ╠═b83f22cd-e5c0-4ef5-9afe-bc5a604800c3
 # ╟─e6ff0e98-f662-11ea-03a7-e3d09e6272a6
 # ╟─737c3da8-15ce-4f05-8c6b-c1eae0998630
 # ╟─2abf49e0-f663-11ea-25f3-2f9229de732e
