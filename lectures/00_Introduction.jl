@@ -66,17 +66,17 @@ begin
 		!!! tip "Objective setting"
 			What specific outcomes, metrics, or insights are desired from the M&S effort?
 			
-			E.g. predict throughput, minimize waiting time, compare strategies, understand sensitivity).
+			E.g. predict throughput, minimize waiting time, compare strategies, understand sensitivity.
 		"""
 	problem = PlutoUI.details("Problem definition & objective setting", problem_content, open=false)
 
 	system_analysis_content = md"""
 		* Information gathering: data, expert knowledge, and existing theories about the system's components, behaviors, interactions, and environment.
-		* Indentify key elements: determine the crucial entities, variables, parameters, relationships, and processes that influence the system's behavior relevant to the objectives.
+		* Identify key elements: determine the crucial entities, variables, parameters, relationships, and processes that influence the system's behavior relevant to the objectives.
 
 		This study can lead to a "conceptual model": a high-level, often qualitative, representation of the system (schematic)
 		!!! warning "Warning"
-		    Always Explicitly list the assumptions made to simplify the model!
+		    Always explicitly list the assumptions made to simplify the model!
 		"""
 	system = PlutoUI.details("System analysis & conceptual modeling", system_analysis_content, open=false)
 	
@@ -90,19 +90,19 @@ begin
 		!!! tip "Verification "
 			*Did we build the model right?*
 
-		    This can included testing with simple/known inputs where the output can be manually calculated or analytically derived. 
+		    This can include testing with simple/known inputs where the output can be manually calculated or analytically derived. 
 
-			``\Rightarrow`` this ensure the computer code accurately implements the formal model description.
+			``\Rightarrow`` this ensures the computer code accurately implements the formal model description.
 
 		!!! tip "Validation "
 			*Did we build the right model?*
 
-		    This can included:
+		    This can include:
 			* comparing model output against real-world data, against analytical models or results from other validated simulations
 			* sensitivity analysis (does the model respond plausibly to parameter changes?), 
 			* involving subject matter experts (SMEs) to review model behavior and outputs (aka "face validation").
 
-			``\Rightarrow`` this assess whether the model's behavior and outputs are a reasonable representation of the real-world system for the intended purpose.
+			``\Rightarrow`` this assesses whether the model's behavior and outputs are a reasonable representation of the real-world system for the intended purpose.
 		
 		"""
 	formal_model = PlutoUI.details("Formal model development", formal_model_content, open=false)
@@ -141,11 +141,11 @@ end
 # ╔═╡ d0e8fe4b-8b76-4d95-9872-ba16d09ad217
 md"""
 ## Course overview
-The following topics will be adressed during this course:
+The following topics will be addressed during this course:
 * Introduction
 * Cellular automata
-* Physical modeling & self-organization
-* Networks (graphs) & Agent-based modeling
+* Physical modelling & self-organisation
+* Networks (graphs) & Agent-based modelling
 * Optimisation techniques
 * Monte Carlo Methods
 * Discrete Event Simulation (DES)
@@ -154,7 +154,7 @@ The following topics will be adressed during this course:
 * Project work (mid-November ``\rightarrow`` December)
 
 ## Evaluation
-* Test in Otober, 2Hr, date TBD.
+* Test in October, 2Hr, date TBD.
 * Exam: Individual project with oral defense that illustrates the complete M&S pipeline
 """
 

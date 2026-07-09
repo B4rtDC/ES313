@@ -76,7 +76,7 @@ md"""
 
 # ╔═╡ 439f0f9f-bb4d-4f28-855f-2d20c5207e09
 md"""
-!!! important "Monte Carlo estimates are random variables"
+!!! warning "Monte Carlo estimates are random variables"
 	A Monte Carlo result should almost never be reported as one number only. If
 	```math
 	\hat{\mu}_N = \frac{1}{N}\sum_{i=1}^{N} f(X_i),
@@ -282,13 +282,13 @@ prior = PlutoUI.details("Prior", [prior_content], open=false)
 likelihood_content = md"""
 We can determine the likelihood of our data based on its assumed model (Poisson) and the parameter: 
 ```math
-P(D | \lambda) = \prod_{i=1}^{N} \frac{\lambda^x_i e^{-\lambda}}{x_i!}
+P(D | \lambda) = \prod_{i=1}^{N} \frac{\lambda^{x_i} e^{-\lambda}}{x_i!}
 ```
 """
 likelihood = PlutoUI.details("Likelihood", [likelihood_content], open=false)
 
 posterior_content = md"""
-We can determine the likelihood of our data based on its assumed model (Poisson) and the parameter: 
+We combine the likelihood with the prior to obtain the posterior, up to the normalising constant $P(D)$:
 ```math
 P(\lambda | D ) \propto P(\text{data} | \lambda)  P(\lambda)
 ```
@@ -555,7 +555,7 @@ md"""
 	x^2/2 + x/2 = U \rightarrow X = (-1 \pm \sqrt{1 + 8U}) / 2. 
 	```
     
-	However, we can only have values of $X$ in the interval $[0,1]$, so we take the positive root: $X = (-1 \pm \sqrt{1 + 8U}) / 2$.
+	However, we can only have values of $X$ in the interval $[0,1]$, so we take the positive root: $X = (-1 + \sqrt{1 + 8U}) / 2$.
 
 	If we check the boundaries: $U=0\rightarrow X=0$, $U=1\rightarrow X=1$. This function is never zero-valued in the relevant domain, which in principle makes it a better candidate.
 """
@@ -711,9 +711,9 @@ end
 
 # ╔═╡ 708ffc5b-83b6-48b2-a0d1-bdabd970ee9a
 md"""
-# Application
+# Applications
 ## Global clustering coefficient
-In the one of the previous lectures, we discussed graphs. The clustering coefficient is a measure of the degree to which nodes in a graph tend to cluster together (i.e. form triangles)
+In the Networks and graphs lecture (03), we discussed graphs. The clustering coefficient is a measure of the degree to which nodes in a graph tend to cluster together (i.e. form triangles)
 
 !!! info "Global clustering coefficient"
 	Given a graph $G(V,E)$ with nodes $v_i$ and edges $e_{ij}$, the global clustering coefficient $C$ is defined as:
@@ -724,7 +724,7 @@ In the one of the previous lectures, we discussed graphs. The clustering coeffic
 	For large, and dense graphs, computing the exact value can be very expensive, which is why we will resort to a Monte Carlo approach
 
 ### Standard Monte Carlo
-For a standard approach, we would simply select a random triplet $(u,v,w)$ (in which the edges $e_{uv}$, and $e_{vw}$ exist), and evaluate if $e_{uw}$ also exists.
+For a standard approach, we would simply select a random triplet $(u,v,w)$ (in which the edges $e_{uv}$, and $e_{vw}$ exist), and evaluate if $e_{uw}$ also exists. **Note:** the implementation below picks the centre node $v$ uniformly at random, so every node counts equally rather than in proportion to the number of wedges it forms. This makes the estimator converge to the *mean local* clustering coefficient, not the *global* one, so its relative error settles at a nonzero floor as $N$ grows. The stratified estimator corrects this by weighting nodes by their wedge count. (Alternatively, fix the code so `random_triplet` samples the centre proportionally to `wedge_count(degree)`, making both estimators unbiased and reducing the comparison to pure variance reduction.)
 
 
 ### Stratified 
@@ -854,12 +854,9 @@ end
 
 # ╔═╡ a39321e9-96f9-49e8-abb3-17fe4ab3a20e
 begin
-	# repeatability
-	Random.seed!(COURSE_SEED)
-	
-	# generate graph
+	# generate graph (seeded reproducibly via the Graphs.jl kwarg, never the global RNG)
 	graph_size = RUN_EXPENSIVE_MONTE_CARLO ? 4000 : 2000
-	G = barabasi_albert(graph_size, 5)       # Barabasi-Albert graph
+	G = barabasi_albert(graph_size, 5; seed=COURSE_SEED)       # Barabasi-Albert graph
 	# exact value
 	C_exact = global_clustering_coefficient(G) # Note: the denser the graph, the longer this computation takes, you can verify this by increasing the second parameter of the barabasi_albert function
 	
@@ -973,9 +970,9 @@ Then
 
 Neutron flux can also be defined as ``\phi= n_nv_n`` where ``n_n`` is neutron density per cm3 in beam, ``v_n`` relative velocity (cm/s) of neutrons in beam.
 
-Cross section ``\sigma`` can be experimentally measured as function of energy: ``\sigma\left(E\right)``, expressed in “barns” (b) with 1b = 10e-24cm$^2$.
+Cross section ``\sigma`` can be experimentally measured as function of energy: ``\sigma\left(E\right)``, expressed in “barns” (b) with 1b = $10^{-24}$ cm$^2$.
 
-#### Neutron reaction cross sections
+#### Reaction types (scattering, absorption, fission)
 
 Cross sections ``\sigma\left(E\right)`` can be separated into different types of reactions – scattering, absorption, fission:
 ```math
@@ -1327,7 +1324,7 @@ begin
 
 	function spontaneousfission(ev::AbstractEvent, bomb::Bomb)
 	    sim = environment(ev)
-	    for _ in rand(bomb.rng, numberofneutronsspontaneousdistr)
+	    for _ in 1:rand(bomb.rng, numberofneutronsspontaneousdistr)
 	        Neutron(sim, bomb, rand(bomb.rng) * bomb.radius)
 	    end
 	    rate = ρᵤ * 4/3 * π * bomb.radius^3 * numberofspontaneousfis
