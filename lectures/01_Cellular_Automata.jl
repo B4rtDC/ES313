@@ -130,7 +130,7 @@ Based on the byte positions, we can convert a rule into an integer. The present 
 ```math
 \sum_{i=0}^{7} b_{i} 2^{i}.
 ```
-When aplied to the example in the table, we find "rule 50": ``32 + 16 + 2 = 50``
+When applied to the example in the table, we find "rule 50": ``32 + 16 + 2 = 50``
 """
 
 # ╔═╡ 2d708d14-38ff-4554-b3ce-a2e5b8ef7eff
@@ -181,10 +181,10 @@ We now need to define a function that allows us to apply a rule to a cell knowin
 """
 	applyrule1dim(rule::BitArray{1}, state::BitArray{1})
 
-Return the new state based on the own states and the left and right neigbour.
+Return the new state from the cell's own value and its left and right neighbour.
 """
 function applyrule1dim(rule::BitArray{1}, state::BitArray{1})
-	# get position of the state in the rule in rule
+	# get position of the state within the rule
     pos = 8 - (state[3] + 2*state[2] + 4*state[1])
 	# return next value
     return rule[pos]
@@ -306,7 +306,7 @@ md"""#### Class 2
 
 Generation of a simple pattern with nested structure, i.e. a pattern that contains many smaller versions of itself, eg. rule_50.
 
-Example that looks like a Sierpinsi triangle (fractal): rule_18."""
+Example that looks like a Sierpinski triangle (fractal): rule_18."""
 
 # ╔═╡ 2bcfc580-eb96-11ea-1837-c703fac6cd69
 let
@@ -368,13 +368,6 @@ md"""- After about 100 steps, simple repeating patterns emerge, but there are a 
 - Collisions between spaceships yields different results depending on their type and their phase. Some collisions annihilate both ships; other leaves one ship unchanged; still other yield one or more ships of different types.
 
 - The collisions are the basis of computation in a rule110 CA. You can think of spaceships as signals that propagate through space, and collisions as gates that compute logical operations like AND and OR."""
-
-# ╔═╡ 11fa5930-eb97-11ea-274e-3f2c45958666
-md"""
-We can define our own struct to represent the Turing State-Machine:"""
-
-# ╔═╡ 9b61fa20-eb97-11ea-0f1c-c922c04a796f
-md"Implementation of a step:"
 
 # ╔═╡ c21ab861-5522-436c-a253-18b664592528
 md"""
@@ -477,9 +470,9 @@ end
 
 # ╔═╡ e9194e90-4afd-4645-bf07-7ee276b3e12c
 """
-	goltest()
+	goltest(xdim::Int, ydim::Int)
 
-Testing function to create a random GoL instance of size `xdim` x `ydim`. 
+Testing function to create a random GoL instance of size `xdim` x `ydim`.
 
 *Note*: borders will be padded with zeros
 """
@@ -488,7 +481,7 @@ function goltest(xdim::Int, ydim::Int)
 	gol = Gol(xdim+2, ydim+2)
 	# fill with random
 	gol.bits[2:xdim+1,2:ydim+1] = reshape(bitrand(xdim*ydim), (xdim,ydim))
-	
+
 	return gol
 end
 
@@ -503,6 +496,9 @@ gol.bits
 
 # ╔═╡ 147af6e2-6927-4ee6-a402-7efe5550b418
 visualize2dim(gol.bits, 20)
+
+# ╔═╡ 00d70d42-ab51-4d9c-be55-a149a4faa640
+md"State after one Game-of-Life update:"
 
 # ╔═╡ 6bfc41ee-a799-4c95-863a-46ac7110ff10
 visualize2dim(applyrule!(gol), 20)
@@ -597,13 +593,13 @@ else
 end
 
 # ╔═╡ 4ab7fbe2-c8a8-44e5-91d3-c1eb7d15b7ee
-md"""#### Methusalems
+md"""#### Methuselahs
 
 From most initial conditions, GoL quickly reaches a stable state where the number of live cells is nearly constant (possibly with some oscillation).
 
-But there are some simple starting conditions that yield a surprising number of live cells, and take a long time to settle down. Because these patterns are so long-lived, they are called “Methusalems”.
+But there are some simple starting conditions that yield a surprising number of live cells, and take a long time to settle down. Because these patterns are so long-lived, they are called “Methuselahs”.
 
-One of the simplest Methusalems is the r-pentomino, which has only five cells, roughly in the shape of the letter 'r'."""
+One of the simplest Methuselahs is the r-pentomino, which has only five cells, roughly in the shape of the letter 'r'."""
 
 # ╔═╡ 6a2a9c8a-5a39-4ccd-aa4b-a9a333be92b8
 """
@@ -740,18 +736,20 @@ function stepturing!(turing::Turing, applyrule::Function)
     (write, dir, turing.state) = applyrule(turing.state, read)
     turing.tape[turing.position] = write
     if dir == 'L'
-        if turing.position == length(turing.tape)
-            push!(turing.tape, false)
-        end
+        # move the head left, extending the tape at the left end when needed
         turing.position -= 1
+        if turing.position == 0
+            pushfirst!(turing.tape, 0)
+            turing.position = 1
+        end
     else
-        if turing.position == 1
-            pushfirst!(turing.tape, false)
-        else
-            turing.position += 1
+        # move the head right, extending the tape at the right end when needed
+        turing.position += 1
+        if turing.position > length(turing.tape)
+            push!(turing.tape, 0)
         end
     end
-	
+
     return nothing
 end
 
@@ -825,8 +823,6 @@ end
 # ╟─a075adee-eb96-11ea-3ddc-572f2795d6b5
 # ╠═aed6b5b0-eb96-11ea-2a3d-7f82f61ea518
 # ╟─c56df180-eb96-11ea-1a57-2d0571da6ac3
-# ╟─11fa5930-eb97-11ea-274e-3f2c45958666
-# ╟─9b61fa20-eb97-11ea-0f1c-c922c04a796f
 # ╟─c21ab861-5522-436c-a253-18b664592528
 # ╠═3d3d0ff7-1026-4ce2-85d6-5606c6b86dba
 # ╠═7bc324ef-c92e-44e6-9d74-6f8c47be5d4e
@@ -837,6 +833,7 @@ end
 # ╠═6fd08ac6-932e-45d8-9fd8-a4c87e90b139
 # ╠═1c0a1ea7-0fb8-40b5-96cf-e1321ec2c05d
 # ╠═147af6e2-6927-4ee6-a402-7efe5550b418
+# ╟─00d70d42-ab51-4d9c-be55-a149a4faa640
 # ╠═6bfc41ee-a799-4c95-863a-46ac7110ff10
 # ╟─aea98b31-7840-4822-b731-12c5a40b14b5
 # ╠═37f558b7-8df1-4ab7-9394-78d2eb8032c1
