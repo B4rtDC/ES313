@@ -224,7 +224,7 @@ Let's assume that the car from our last example is an electric vehicle. Electric
 
 We can model this with an additional charge process for our car. Therefore, we redefine our car process function and add a charge process function.
 
-A new charge process is started every time the vehicle starts parking. By yielding the `Process` instance that the `@process` macro returns, the run process starts waiting for it to finish:
+A new charge process is started every time the vehicle starts parking. By yielding the `Process` instance that the `@process` macro returns, the car process starts waiting for it to finish:
 
 $(Markdown.parse(function_source_extractor(txt, "charge")))
 
@@ -479,6 +479,20 @@ let
 	)
 end
 
+# ╔═╡ f8412def-5272-4f58-8a8b-5bfae9fdfbf8
+md"""
+!!! tip "Verification: simulation vs. theory"
+	Placing the simulated estimates next to the closed-form M/M/1 results is a **verification** step — a check that we *built the model right*. With arrival rate ``\lambda = 0.8`` and service rate ``\mu = 1.0`` the traffic intensity is ``\rho = \lambda/\mu = 0.8``, and the long-run theory is known exactly:
+
+	```math
+	E[W_q] = \frac{\rho}{\mu - \lambda} = 4, \qquad
+	L = \frac{\rho}{1 - \rho} = 4, \qquad
+	\text{utilisation} = \rho = 0.8 .
+	```
+
+	So the 95% confidence interval for the mean waiting time above should **bracket** the analytical ``E[W_q] = 4``; likewise the time-average number in system and the estimated utilisation in the summary table should track ``L = 4`` and ``\rho = 0.8`` (``L`` is the theoretical benchmark the table leaves implicit). When the interval covers the theory, the implementation is behaving as intended. Any small residual gap reflects finite run length and initialisation bias — the queue starts empty — rather than a bug, and it shrinks as the horizon or the number of replications grows.
+"""
+
 # ╔═╡ e04cf3fa-e5e2-4817-a3fd-82ccebfdee58
 md"""
 ### Repair problem
@@ -487,8 +501,7 @@ This problem is taken from *Ross, Simulation 5th edition, Section 7.7, p. 124-12
 
 A system needs ``n`` working machines to be operational. To guard against machine breakdown, additional machines are kept available as spares. Whenever a machine breaks down it is immediately replaced by a spare and is itself sent to the repair facility, which consists of a single repairperson who repairs failed machines one at a time. Once a failed machine has been repaired it becomes available as a spare to be used when the need arises. All repair times are independent random variables having the common distribution function ``G``. Each time a machine is put into use the amount of time it functions before breaking down is a random variable, independent of the past, having distribution function ``F``.
 
-The system is said to “crash” when a machine fails and no spares are available. Assuming that there are initially ``n + s`` functional machines of which ``n`` are put in use and ``
-s`` are kept as spares, we are interested in simulating this system so as to approximate ``E[T]``, where ``T`` is the time at which the system crashes.
+The system is said to “crash” when a machine fails and no spares are available. Assuming that there are initially ``n + s`` functional machines of which ``n`` are put in use and ``s`` are kept as spares, we are interested in simulating this system so as to approximate ``E[T]``, where ``T`` is the time at which the system crashes.
 
 #### Building the simulation's components
 """
@@ -499,9 +512,11 @@ begin
 	RUNS = RUN_EXPENSIVE_DES ? 100 : 12
 	N = 10
 	S = 3
-	LAMBDA = 100.0
-	MU = 1.0
+	LAMBDA = 100.0  # mean time-to-failure (Exponential scale = mean, NOT a rate)
+	MU = 1.0        # mean repair time
 
+	# F: machine lifetime, G: repair time. Distributions.Exponential(θ) takes θ as
+	# the MEAN, so failures are rare (mean 100) and repairs are quick (mean 1).
 	F = Exponential(LAMBDA)
 	G = Exponential(MU)
 end;
@@ -527,7 +542,7 @@ end
 # ╔═╡ b92162ba-b03b-4c50-b23d-a37d2c24964a
 md"""
 #### Monte Carlo approach
-One repair simulation gives one possible crash time. To estimate ``E[T]`` we run independent replications, then summarise the sample mean and its uncertainty. The seeds below are deliberately separated by replication so threaded execution remains reproducible.
+One repair simulation gives one possible crash time. Unlike the M/M/1 queue, this model has no simple closed-form benchmark to check against, so verification here leans on inspecting component behaviour (e.g. a single traced run) rather than matching an analytical result. To estimate ``E[T]`` we run independent replications, then summarise the sample mean and its uncertainty. The seeds below are deliberately separated by replication so threaded execution remains reproducible.
 """
 
 # ╔═╡ 9d268a7e-1dac-4778-95f2-032566c9184b
@@ -553,6 +568,12 @@ md"#### Result visualisation"
 
 # ╔═╡ 0481a4b0-bdbb-488c-80cf-16581b2f2c25
 boxplot(repair_results, label="", ylabel="Time to failure", xticks=false, size=(200,400))
+
+# ╔═╡ eb48496b-eb22-4130-bd77-cf4a39899b2a
+md"""
+#### Sensitivity analysis
+Adding spare machines is a **design lever**: more spares should postpone the crash, but each extra machine costs money, so we want to know how much reliability it actually buys. The plot below re-runs the whole repair model for each spare count ``s`` and reports the mean time to crash with a 95% confidence band. Read as a small design-of-experiments study, it shows the reliability benefit growing as spares are added — while the width of the band at the reduced replication count is a reminder of how uncertain each estimate still is.
+"""
 
 # ╔═╡ f6df869a-6dab-44d7-8a24-f2eb490a640d
 let
@@ -628,6 +649,7 @@ More extensive examples will be covered during the practical sessions.
 # ╠═e9b71027-e644-47cd-b871-d9a6bb798b64
 # ╟─ecfb933c-811b-43ee-b67e-40351663efc3
 # ╠═b1f3ea9d-5480-4d79-92b2-5b3e501db2fc
+# ╟─f8412def-5272-4f58-8a8b-5bfae9fdfbf8
 # ╟─e04cf3fa-e5e2-4817-a3fd-82ccebfdee58
 # ╠═e566e732-129e-45eb-8b24-98064dc42a75
 # ╟─6b1ac314-546c-4a36-b618-ba371ca8a0da
@@ -637,5 +659,6 @@ More extensive examples will be covered during the practical sessions.
 # ╠═f3143b74-3876-43b9-a7d7-30ea11d5b98a
 # ╟─b97efb24-fd1f-4fd3-ad17-f444c149511e
 # ╟─0481a4b0-bdbb-488c-80cf-16581b2f2c25
+# ╟─eb48496b-eb22-4130-bd77-cf4a39899b2a
 # ╟─f6df869a-6dab-44d7-8a24-f2eb490a640d
 # ╟─33cecba2-41be-44ca-93ce-d13464b0c564
