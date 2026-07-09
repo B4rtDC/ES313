@@ -67,7 +67,7 @@ html"""
 # ╔═╡ dfe045a5-b5a4-4b98-aad8-668d2fd77c1e
 begin
 	OVERVIEW_SEED = 307
-	RUN_BENCHMARKS = true
+	RUN_BENCHMARKS = false
 	overview_rng(seed::Integer=OVERVIEW_SEED) = MersenneTwister(seed)
 
 	function mean_ci(values; z=1.96)
@@ -326,8 +326,8 @@ md"""
 Looking at the output of the time-stepping procedure, we can observe for a lot of the time-steps the state of our system (i.e. the number of clients in the system) does not change. So the procedure does a lot of processing for nothing.
 
 To be more efficient, we can predict
-- the next arrival of a client by sampling an exponential distribution with parameter ``\frac{1}{\lambda}``;
-- the service time of a client by sampling an exponential distribution with parameter ``\frac{1}{\mu}``.
+- the next arrival of a client by sampling an exponential distribution with mean ``\frac{1}{\lambda}`` (i.e. rate ``\lambda``);
+- the service time of a client by sampling an exponential distribution with mean ``\frac{1}{\mu}`` (i.e. rate ``\mu``).
 
 
 Only during an arrival of a client or an end of service of a client, the state of the systems changes.
@@ -425,7 +425,7 @@ We can try to retrieve the analytical descriptors using simulation
 ##### Estimating ``P_n``
 
 
-**Note:** you should normalize the probabilities of states for the time spent in them.
+**Note:** each state's probability must be weighted by the total time the system spends in that state (a time average), not by how many times the state is visited.
 """
 
 # ╔═╡ bfd5a133-004d-4889-b541-f40e05b51e54
@@ -471,7 +471,7 @@ end
 
 # ╔═╡ 8e02afc1-1471-4d03-9a37-2d82526e0e80
 md"""
-#### Estimating ``\mathbb{E}[W_Q]``
+##### Estimating ``\mathbb{E}[W_Q]``
 To get an estimate of the mean time spent waiting, we need to retrieve this information from our simulation.
 """
 
@@ -487,6 +487,16 @@ let
 	scatter!([1], [λ / (μ * (μ - λ))], marker=:x, color=:black, label="Theoretical")
 	plot!(xticks=false, xlims=(0,2), xlabel="", ylabel=L"\mathbb{E}[W_Q]", ylims=(0.2, 1.0), title="Mean waiting time distribution", size=(400, 400))
 end
+
+# ╔═╡ 0eaac249-2020-4264-a8d2-1a68eb1fe4dc
+md"""
+!!! info "Verification vs. validation"
+	The boxplots above overlay the simulated descriptors (``\hat{P}_n``, ``\mathbb{E}[W_Q]``, and later ``\mathbb{E}[L]``) on their analytical M/M/1 values. Reproducing those curves is a **verification** check: it is evidence that our code implements the *intended* model correctly — the arrival and service streams, the single-server FCFS logic and the trace bookkeeping all behave as the M/M/1 equations predict.
+
+	It is **not** a **validation** of the model. Validation asks whether M/M/1 is the *right* model for the real system under study. That requires confronting the simulation with real-world data and checking whether its assumptions — Poisson arrivals, exponential service times, FCFS discipline, a single server and an infinite waiting room — actually hold for that system. A simulation can agree perfectly with theory and still be the wrong model for the problem at hand.
+
+	In the language of the M&S pipeline: matching the analytical descriptors answers *"did we build the model right?"* (verification), not *"did we build the right model?"* (validation).
+"""
 
 # ╔═╡ 3ddd4941-a578-4c1d-b42a-ed1e47e85f39
 md"""
@@ -525,7 +535,7 @@ function summarize_trace(times::Vector{Float64}, output::Vector{Int}, wait_times
 end
 
 # ╔═╡ be35839a-c05f-4f4e-ab6b-fbe1f28b68d1
-function MM1_trace_summary(interarrival_distribution::UnivariateDistribution, service_distribution::UnivariateDistribution, max_time::Real; seed::Int=161)
+function MM1_trace_summary(interarrival_distribution::UnivariateDistribution, service_distribution::UnivariateDistribution, max_time::Real; seed::Int=7_000)
 	times, output, wait_times = MM1_queue_simulation(interarrival_distribution, service_distribution, max_time; rng=overview_rng(seed))
 	return summarize_trace(times, output, wait_times, max_time)
 end
@@ -574,9 +584,9 @@ begin
 
 	function MM1_queue_simulation_trace(interarrival_distribution::UnivariateDistribution,
 			service_distribution::UnivariateDistribution,
-			max_time::Real; seed::Int=161, max_events_hint::Int=10_000)
+			max_time::Real; seed::Int=7_000, max_events_hint::Int=10_000)
 		sim = Simulation()
-		rng = Random.MersenneTwister(seed)
+		rng = overview_rng(seed)
 		times = Float64[now(sim)]
 		output = Int[0]
 		wait_times = Float64[]
@@ -591,7 +601,7 @@ end
 
 # ╔═╡ 6b95be91-2b47-49cb-82ff-2a548ba0b023
 let
-	times, output, wait_times = MM1_queue_simulation_trace(interarrival_distribution, service_distribution, 100.0; seed=161)
+	times, output, wait_times = MM1_queue_simulation_trace(interarrival_distribution, service_distribution, 100.0; seed=7_000)
 	summarize_trace(times, output, wait_times, 100.0)
 end
 
@@ -660,9 +670,9 @@ begin
 
 	function MM1_queue_summary(interarrival_distribution::UnivariateDistribution,
 			service_distribution::UnivariateDistribution,
-			max_time::Real; seed::Int=161)
+			max_time::Real; seed::Int=7_000)
 		sim = Simulation()
-		rng = Random.MersenneTwister(seed)
+		rng = overview_rng(seed)
 		acc = MM1Accumulator(now(sim), 0, 0.0, 0.0, 0, 0, 0)
 		@process packet_generator_online!(sim, rng, interarrival_distribution, service_distribution, acc)
 		run(sim, max_time)
@@ -672,7 +682,7 @@ end
 
 # ╔═╡ 9f7e106a-f7a1-4837-b354-b58dfe6711fa
 begin
-	function MM1_many_runs_serial(nruns::Int, max_time::Real; seed::Int=161)
+	function MM1_many_runs_serial(nruns::Int, max_time::Real; seed::Int=7_000)
 		summaries = Vector{MM1Summary}(undef, nruns)
 		for i in eachindex(summaries)
 			summaries[i] = MM1_queue_summary(interarrival_distribution, service_distribution, max_time; seed=seed+i)
@@ -680,7 +690,7 @@ begin
 		return summaries
 	end
 
-	function MM1_many_runs_threaded(nruns::Int, max_time::Real; seed::Int=161)
+	function MM1_many_runs_threaded(nruns::Int, max_time::Real; seed::Int=7_000)
 		summaries = Vector{MM1Summary}(undef, nruns)
 		Threads.@threads for i in eachindex(summaries)
 			summaries[i] = MM1_queue_summary(interarrival_distribution, service_distribution, max_time; seed=seed+i)
@@ -701,7 +711,7 @@ end
 
 # ╔═╡ c056fe7c-c760-4c07-83c1-56c3f7cc4c9d
 let
-	summaries = MM1_many_runs_threaded(12, 250.0; seed=161)
+	summaries = MM1_many_runs_threaded(12, 250.0; seed=7_000)
 	summarize_runs(summaries)
 end
 
@@ -779,14 +789,14 @@ Benchmarks are skipped by default to keep the notebook responsive. Set `RUN_BENC
 # ╔═╡ da95e3bf-3ba0-496b-bb0e-34cf3eab9a3f
 function benchmark_mm1_variants(; max_time::Float64=120.0, nruns::Int=4)
 	variants = [
-		("trace + posthoc", () -> MM1_trace_summary(interarrival_distribution, service_distribution, max_time; seed=161)),
+		("trace + posthoc", () -> MM1_trace_summary(interarrival_distribution, service_distribution, max_time; seed=7_000)),
 		("local rng trace", () -> begin
-			times, output, wait_times = MM1_queue_simulation_trace(interarrival_distribution, service_distribution, max_time; seed=161)
+			times, output, wait_times = MM1_queue_simulation_trace(interarrival_distribution, service_distribution, max_time; seed=7_000)
 			summarize_trace(times, output, wait_times, max_time)
 		end),
-		("online summary", () -> MM1_queue_summary(interarrival_distribution, service_distribution, max_time; seed=161)),
-		("serial replications", () -> MM1_many_runs_serial(nruns, max_time; seed=161)),
-		("threaded replications", () -> MM1_many_runs_threaded(nruns, max_time; seed=161)),
+		("online summary", () -> MM1_queue_summary(interarrival_distribution, service_distribution, max_time; seed=7_000)),
+		("serial replications", () -> MM1_many_runs_serial(nruns, max_time; seed=7_000)),
+		("threaded replications", () -> MM1_many_runs_threaded(nruns, max_time; seed=7_000)),
 	]
 
 	names = String[]
@@ -813,7 +823,7 @@ function benchmark_mm1_variants(; max_time::Float64=120.0, nruns::Int=4)
 end
 
 # ╔═╡ e2958e8e-a1b1-4f77-bb42-f3e62e9a77cc
-if true#RUN_BENCHMARKS
+if RUN_BENCHMARKS
 	benchmark_mm1_variants()
 else
 	DataFrame(
@@ -900,6 +910,7 @@ The regenerative approach helps address the issue of autocorrelation in simulati
 # ╟─bfd5a133-004d-4889-b541-f40e05b51e54
 # ╟─8e02afc1-1471-4d03-9a37-2d82526e0e80
 # ╠═af159f28-a476-402f-9f96-123b2cbf5f8f
+# ╟─0eaac249-2020-4264-a8d2-1a68eb1fe4dc
 # ╟─3ddd4941-a578-4c1d-b42a-ed1e47e85f39
 # ╠═a874701c-f450-4016-bc37-46c7b7554dd0
 # ╠═15e9aff1-695e-4178-885a-3306d0367ed2
