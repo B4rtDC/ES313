@@ -4,7 +4,7 @@ This is a small guide intended to put you on your way for this course. We will b
 We try to make sure that the installation and configuration runs as smoothly as possible with a minimum of effort on your part. These guidelines work for Windows, MacOS and Linux. Occasionally there is a small difference between the platforms that will be made clear during this walkthrough. This guide has been successfully tested on Windows 11 Enterprise (CDN), MacOS and Ubuntu.
 
 ## Tools
-* You will be using the Julia REPL in combination Pluto notebooks.
+* You will be using the Julia REPL in combination with Pluto notebooks.
 * For code development you could use Notepad++ or Visual Studio Code (available in the CDN software center). There is a Julia language extension ([Notepad++](https://github.com/JuliaEditorSupport/julia-NotepadPlusPlus)/[VS Code](https://code.visualstudio.com/docs/languages/julia)) available for both. We use Visual Studio Code for this course.
 
 
@@ -36,7 +36,7 @@ from the software center when connected to CDN and then connect to an open netwo
         ```
 
         The `juliaup` command only works after Juliaup itself has been installed.
-2. Copy the configuration script from [here](https://raw.githubusercontent.com/B4rtDC/ES313/master/setup/config.jl) and store it as a .jl file (e.g. with Notepad++ or VSCode). Things to modify by yourself (if required):
+2. Copy the configuration script from [here](https://raw.githubusercontent.com/B4rtDC/ES313/main/setup/config.jl) and store it as a .jl file (e.g. with Notepad++ or VSCode). Things to modify by yourself (if required):
     * For Windows: the path to your `Git` install. The default path is the one that should work for CDN, i.e.
         ```julia
         const git_path_windows = "C:\\Program Files\\Git\\bin\\git.exe"
@@ -53,7 +53,7 @@ from the software center when connected to CDN and then connect to an open netwo
 
         if you want to use another path, you can change it, e.g.
         ```Julia
-        joinpath(homedir(),"Documents","3Ba","Sem1","ES313")
+        joinpath(homedir(),"Documents","3Ba","Sem1")
         ```
         will download the course folder into 
         * `C:\\Users\\YourAccount\\Documents\\3Ba\\Sem1\\ES313` (Windows)
@@ -78,7 +78,7 @@ You are now ready to start working on the course. Tested on:
 * :white_check_mark: MacOS 26.5.1
 * :white_check_mark: Windows 11 (CDN build 26200.8346)
 
-:bulb: You might want to associate ``*.jl` files with Julia. After doing so, you can simply double click on a file to start working or fetch updates instead of having to pass by the terminal or REPL.
+:bulb: You might want to associate `*.jl` files with Julia. After doing so, you can simply double click on a file to start working or fetch updates instead of having to pass by the terminal or REPL.
 
 
 ### Getting updates (run when needed)
@@ -117,7 +117,7 @@ Some lectures may get updates during the semester. If you have followed the inst
     ```bash
     julia +1.10 -t auto path/to/ES313/setup/start.jl # on Mac/Linux
     ```
-2. By default the present working directory is changed to the one for this course, this means that you can open every single notebook simply by using a relative path e.g. `./Exercises/PS01 - Visualisation.jl` or `./Lectures/Lecture00.jl`. After typing `./`, you can even use the tab key for autocomplete.
+2. By default the present working directory is changed to the one for this course, this means that you can open every single notebook simply by using a relative path e.g. `./applications/PS01-Cellular_Automata.jl` or `./lectures/00_Introduction.jl` (note the lowercase directory names, which matter on Linux). After typing `./`, you can even use the tab key for autocomplete.
 
 ### Troubleshooting
 * The setup scripts intentionally stop when they are not run with Julia 1.10.x. On personal computers, check `juliaup status` and use `julia +1.10 ...`. On CDN Windows, check that you are using `C:\Program Files\Julia-1.10\bin\julia.exe`.
