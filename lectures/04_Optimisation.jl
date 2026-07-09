@@ -63,8 +63,8 @@ In this chapter we will have a look at some optimisation methods, and their appl
 	```
 	where 
 	```math
-	\begin{array}
-	\vec{x} \in \mathbb{R}^n,\\ 
+	\begin{array}{l}
+	\vec{x} \in \mathbb{R}^n,\\
 	\Omega \subseteq \mathbb{R}^n,\\  
 	f : \mathbb{R}^n \mapsto \mathbb{R},\\ 
 	\vec{h} :  \mathbb{R}^n \mapsto \mathbb{R}^m \; (m\leq n),\\
@@ -148,7 +148,7 @@ md"""
 	\nabla f\left(\vec x^\star\right) = \vec 0\,.
 	```
 	
-	This point may be a local minimum, maximum or a saddle point. If ``f`` is twice differentiable, and the Hessian, $\mathcal{H}f(\vec{x}^*$), is positive definite, then $\vec{x}^*$ is a local minimum (second order sufficient condition). Additionally, if ``f`` is convex, any local minimum is also a global minimum (cf. analysis courses). For strictly convex functions, the global minimum is unique.
+	This point may be a local minimum, maximum or a saddle point. If ``f`` is twice differentiable, and the Hessian, $\mathcal{H}f(\vec{x}^*)$, is positive definite, then $\vec{x}^*$ is a local minimum (second order sufficient condition). Additionally, if ``f`` is convex, any local minimum is also a global minimum (cf. analysis courses). For strictly convex functions, the global minimum is unique.
 
 
 
@@ -156,7 +156,7 @@ md"""
 !!! danger "Heads up!"
 	1. In order to be able to apply this, we need to have a function that is continuous, which may not always be the case!
 
-	    To apply gradient-based methods, the function ``f`` must be differentiable at ``\vec{x}^*``. For the Hessian test, it must be twice differentiable. If ``f`` is not differentiable, alternative methods are needed. Additionally, linear functions may not have critical points unless, and thus may not have a finite minimum in unconstrained optimization.
+	    To apply gradient-based methods, the function ``f`` must be differentiable at ``\vec{x}^*``. For the Hessian test, it must be twice differentiable. If ``f`` is not differentiable, alternative methods are needed. Additionally, a non-constant linear function has no critical point (its gradient is a nonzero constant vector), and therefore has no finite minimum in unconstrained optimization.
 
 	2. These methods require an initial point. When multiple local minima exist, the initial point will have an impact on the result.
 
@@ -509,6 +509,18 @@ begin
 	end
 end
 
+# ╔═╡ 9089f56d-805b-4654-861d-65359972a72e
+md"""
+!!! tip "What the benchmark tells us"
+	Read the timings and allocations as a decision guide, not as a ranking of a single "best" algorithm. Four practical lessons come out of the benchmark output above:
+
+	1. **Supplying derivatives pays off.** Passing the analytic gradient `g!` (and, for Newton, the Hessian `h!`) is markedly faster and allocates far less than letting `Optim` approximate them with finite differences. On a cheap objective like this the gap is already visible; on an expensive simulation objective it becomes decisive.
+	2. **Newton is fastest near the minimum — if you can afford the Hessian.** With analytic `g!` and `h!` it reaches the solution in the fewest iterations thanks to its quadratic convergence, but it needs the ``n \times n`` Hessian at every step, which is costly or infeasible for large ``n``.
+	3. **Nelder-Mead is robust but slow.** Being derivative-free it needs no gradient at all, which makes it a safe fallback for black-box or non-smooth objectives, but here it converges the slowest.
+	4. **L-BFGS / BFGS are the sensible default.** When only a gradient is available they deliver near-Newton progress without ever forming the Hessian, and they scale to large problems (L-BFGS especially).
+
+	The takeaway matches the philosophy of this lecture: **pick and interpret the solver for your problem — how much derivative information you have, and how large ``n`` is — rather than memorising the internals of each method.**
+"""
 
 # ╔═╡ d4b05c5e-ac08-4a69-b54c-5d825d864bfa
 md"""
@@ -540,7 +552,7 @@ The vector inequality $\vec x\ge\vec 0$ means that each component of $\vec x$ is
 	\min_{\vec{x}} x_1 +5 x_2 \; \text{ subject to } 
 	\cases{
 	5x_1 + 6x_2 \leq 30\\
-	2x_1 + 2x_2 \leq 12\\
+	3x_1 + 2x_2 \leq 12\\
 	x_1 \ge 0\\
 	x_2 \ge 0}
 	```
@@ -995,7 +1007,7 @@ Now suppose that one unit of product $X_1$ sells for €6 and $X_2$, $X_3$ and $
 f\left(x_1,x_2,x_3,x_4\right)=6x_1+4x_2+7x_3+5x_4
 ```
 
-The problem is then to maximize $f$ subject to the given constraints.
+The problem is then to maximize $f$ subject to the given constraints. Because production is counted in whole units, we additionally require the ``x_i`` to be integers, so this is strictly an *integer* linear program (imposing `Int` in the code makes JuMP switch to a branch-and-bound solver).
 """
 
 # ╔═╡ 12bfc573-4b38-499f-89c0-49e6ea70759f
@@ -1808,133 +1820,14 @@ Since we assume that ``Q`` is positive semidefinite, these KKT conditions
 are not only necessary but also sufficient, so we can solve the convex
 quadratic program by finding solutions of this system.
 
-Primal-dual methods generate iterates that satisfy the bounds strictly; that is, ``\vec{y}>0``
-and ``\vec{\mu}>0``. This property is the origin of the term interior-point.
-By respecting these bounds, the methods avoid spurious solutions,
-points that satisfy the system but not the bounds. Spurious solutions
-abound, and do not provide useful information about real solutions,
-so it makes sense to exclude them altogether. Given a current iterate
-``\left(\vec{x}^{\left(k\right)},\vec{y}^{\left(k\right)},\vec{\lambda}^{\left(k\right)},\vec{\mu}^{\left(k\right)}\right)``
-that satisfies ``\left(\vec{\mu}^{\left(k\right)},\vec{y}^{\left(k\right)}\right)>0``,
-we can define a _complementary measure_
-```math
-\nu_{k}=\frac{ \left(\vec{y}^{\left(k\right)}\right)^\mathsf{T}\vec{\mu}^{\left(k\right)}}{p}\,.
-```
-This measure gives an indication of the desirability of the couple
-``\left(\vec{\mu}^{\left(k\right)},\vec{y}^{\left(k\right)}\right)``.
-
-We derive a path-following, primal-dual method by considering the
-perturbed KKT conditions by
-```math
-\vec{F}\left(\vec{x}^{\left(k+1\right)},\vec{y}^{\left(k+1\right)},\vec{\lambda}^{\left(k+1\right)},\vec{\mu}^{\left(k+1\right)},\sigma_{k}\nu_{k}\right)=\begin{pmatrix}Q\vec{x}^{\left(k+1\right)}+ A_{\textrm{eq}}^\mathsf{T}\vec{\lambda}^{\left(k+1\right)}+ A_{\textrm{in}}^\mathsf{T}\vec{\mu}^{\left(k+1\right)}-\vec{c}\\
-Y_{k+1}M_{k+1}\vec{1}-\sigma_{k}\nu_{k}\vec{1}\\
-A_{\textrm{eq}}\vec{x}^{\left(k+1\right)}-\vec{b}_{\textrm{eq}}\\
-A_{\textrm{in}}\vec{x}^{\left(k+1\right)}-\vec{b}_{\textrm{in}}+\vec{y}^{\left(k+1\right)}
-\end{pmatrix}=\vec{0}\,,
-```
-where
-```math
-Y_{k+1}=\begin{pmatrix}y_{1}^{\left(k+1\right)} & 0 & \cdots & 0\\
-0 & y_{2}^{\left(k+1\right)} & \ddots & 0\\
-\vdots & \ddots & \ddots & 0\\
-0 & 0 & 0 & y_{p}^{\left(k+1\right)}
-\end{pmatrix}\,,\quad M_{k+1}=\begin{pmatrix}\mu_{1}^{\left(k+1\right)} & 0 & \cdots & 0\\
-0 & \mu_{2}^{\left(k+1\right)} & \ddots & 0\\
-\vdots & \ddots & \ddots & 0\\
-0 & 0 & 0 & \mu_{p}^{\left(k+1\right)}
-\end{pmatrix}\,,
-```
-and ``\sigma\in\left[0,1\right]`` is the reduction factor that we wish
-to achieve in the complementary measure on one step. We call ``\sigma``
-the _centering parameter_. The solution of this system for all
-positive values of ``\sigma`` and ``\nu`` define the _central path_,
-which is a trajectory that leads to the solution of the quadratic
-program as ``\sigma\nu`` tends to zero.
-
-By fixing ``\sigma_{k}`` and applying Newton's method to the system,
-we obtain the linear system
-```math
-\begin{pmatrix}Q & 0 &  A_{\textrm{eq}}^\mathsf{T} &  A_{\textrm{in}}^\mathsf{T}\\
-0 & M_{k} & 0 & Y_{k}\\
-A_{\textrm{eq}} & 0 & 0 & 0\\
-A_{\textrm{in}} & I & 0 & 0
-\end{pmatrix}\begin{pmatrix}\vec{d}_{\vec{x}}^{\left(k\right)}\\
-\vec{d}_{\vec{y}}^{\left(k\right)}\\
-\vec{d}_{\vec{\lambda}}^{\left(k\right)}\\
-\vec{d}_{\vec{\mu}}^{\left(k\right)}
-\end{pmatrix}=-\begin{pmatrix}Q\vec{x}^{\left(k\right)}+ A_{\textrm{eq}}^\mathsf{T}\vec{\lambda}^{\left(k\right)}+ A_{\textrm{in}}^\mathsf{T}\vec{\mu}^{\left(k\right)}-\vec{c}\\
-Y_{k}M_{k}\vec{1}-\sigma_{k}\nu_{k}\vec{1}\\
-A_{\textrm{eq}}\vec{x}^{\left(k\right)}-\vec{b}_{\textrm{eq}}\\
-A_{\textrm{in}}\vec{x}^{\left(k\right)}-\vec{b}_{\textrm{in}}+\vec{y}^{\left(k\right)}
-\end{pmatrix}\,.
-```
-We obtain the next iterate by setting
-```math
-\begin{pmatrix}\vec{x}^{\left(k+1\right)}\\
-\vec{y}^{\left(k+1\right)}\\
-\vec{\lambda}^{\left(k+1\right)}\\
-\vec{\mu}^{\left(k+1\right)}
-\end{pmatrix}=\begin{pmatrix}\vec{x}^{\left(k\right)}\\
-\vec{y}^{\left(k\right)}\\
-\vec{\lambda}^{\left(k\right)}\\
-\vec{\mu}^{\left(k\right)}
-\end{pmatrix}+\alpha_{k}\begin{pmatrix}\vec{d}_{\vec{x}}^{\left(k\right)}\\
-\vec{d}_{\vec{y}}^{\left(k\right)}\\
-\vec{d}_{\vec{\lambda}}^{\left(k\right)}\\
-\vec{d}_{\vec{\mu}}^{\left(k\right)}
-\end{pmatrix}\,,
-```
-where ``\alpha_{k}`` is chosen to retain the bounds ``\left(\vec{\mu}^{\left(k+1\right)},\vec{y}^{\left(k+1\right)}\right)>0``
-and possibly to satisfy various other conditions.
-
-The choices of centering parameter ``\sigma_{k}`` and step-length ``\alpha_{k}``
-are crucial for the performance of the method. Techniques for controlling
-these parameters, directly and indirectly, give rise to a wide variety
-of methods with diverse properties. One option is to use equal step
-length for the primal and dual updates, and to set ``\alpha_{k}=\min\left\{ \alpha_{k}^{\textrm{pri}},\alpha_{k}^{\textrm{dual}}\right\} ``,
-where
-```math
-\begin{aligned}
-\alpha_{k}^{\textrm{pri}} & =\max\left\{ \alpha\in\left\{ 0,1\right\} :\vec{y}^{\left(k\right)}+\alpha\vec{d}_{\vec{y}}^{\left(k\right)}\geq\left(1-\tau\right)\vec{y}^{\left(k\right)}\right\} \,,\\
-\alpha_{k}^{\textrm{dual}} & =\max\left\{ \alpha\in\left\{ 0,1\right\} :\vec{\mu}^{\left(k\right)}+\alpha\vec{d}_{\vec{\mu}}^{\left(k\right)}\geq\left(1-\tau\right)\vec{\mu}^{\left(k\right)}\right\} \,,
-\end{aligned}
-```
-the parameter ``\tau\in\left]0,1\right[`` controls how far we back
-off from the maximum step for which the conditions ``\vec{y}^{\left(k\right)}+\alpha\vec{d}_{\vec{y}}^{\left(k\right)}\geq\vec{0}``
-and ``\vec{\mu}^{\left(k\right)}+\alpha\vec{d}_{\vec{\mu}}^{\left(k\right)}\geq\vec{0}``
-are satisfied. A typical value of ``\tau=0.995`` and we can choose
-``\tau_{k}`` to approach ``1`` as the iterates approach the solution,
-to accelerate the convergence.
-
-The most popular interior-point method for convex QP is based on Mehrotra's
-predictor-corrector. First we compute an affine scaling step ``\left(\vec{d}_{\vec{x},\textrm{aff}},\vec{d}_{\vec{y},\textrm{aff}},\vec{d}_{\vec{\lambda},\textrm{aff}},\vec{d}_{\vec{\mu},\textrm{aff}}\right)``
-by setting ``\sigma_{k}=0``. We improve upon this step by computing
-a corrector step. Next, we compute the centering parameter ``\sigma_{k}``
-using following heuristic
-```math
-\sigma_{k}=\left(\frac{\nu_{\textrm{aff}}}{\nu_{k}}\right)^{3}\,,
-```
-where ``\nu_{\textrm{aff}}=\frac{ \left(\vec{y}_{\textrm{aff}}\right)^\mathsf{T}\left(\vec{\mu}_{\textrm{aff}}\right)}{p}``.
-The total step is obtained by solving the following system
-```math
-\begin{pmatrix}Q & 0 &  A_{\textrm{eq}}^\mathsf{T} &  A_{\textrm{in}}^\mathsf{T}\\
-0 & M_{k} & 0 & Y_{k}\\
-A_{\textrm{eq}} & 0 & 0 & 0\\
-A_{\textrm{in}} & I & 0 & 0
-\end{pmatrix}\begin{pmatrix}\vec{d}_{\vec{x}}^{\left(k\right)}\\
-\vec{d}_{\vec{y}}^{\left(k\right)}\\
-\vec{d}_{\vec{\lambda}}^{\left(k\right)}\\
-\vec{d}_{\vec{\mu}}^{\left(k\right)}
-\end{pmatrix}=-\begin{pmatrix}Q\vec{x}^{\left(k\right)}+ A_{\textrm{eq}}^\mathsf{T}\vec{\lambda}^{\left(k\right)}+ A_{\textrm{in}}^\mathsf{T}\vec{\mu}^{\left(k\right)}-\vec{c}\\
-Y_{k}M_{k}\vec{1}+\Delta Y_{\textrm{aff}}\Delta M_{\textrm{aff}}\vec{1}-\sigma_{k}\nu_{k}\vec{1}\\
-A_{\textrm{eq}}\vec{x}^{\left(k\right)}-\vec{b}_{\textrm{eq}}\\
-A_{\textrm{in}}\vec{x}^{\left(k\right)}-\vec{b}_{\textrm{in}}+\vec{y}^{\left(k\right)}
-\end{pmatrix}\,,
-```
-where
-```math
-\Delta Y_{\textrm{aff}}=Y_{\textrm{aff}}-Y_{k}\,,\quad\Delta M_{\textrm{aff}}=M_{\textrm{aff}}-M_{k}\,.
-```""")
+From here on, the algorithm is exactly the primal-dual construction developed
+for linear programming above (see the deep dive on interior-point methods in
+the LP section): iterates keep ``\left(\vec{\mu},\vec{y}\right)>0`` strictly
+(the origin of the term *interior point*), progress is measured through the
+_complementary measure_ ``\nu``, the perturbed KKT system is solved with Newton
+steps, and Mehrotra's predictor-corrector scheme chooses the centering
+parameter ``\sigma``. The only structural difference is that the curvature
+term ``Q`` now appears in the first block row of the Newton system.""")
 
 # ╔═╡ 7d2cb249-0d7f-4a69-9f33-4fac6e22f58b
 md"""
@@ -2027,23 +1920,32 @@ md"""
 
 # ╔═╡ 81955573-23b9-4af7-82bf-e6b21cdd36b7
 let
-	Random.seed!(2025)
+	# ParticleSwarm draws from the global RNG (it takes no rng argument), so we
+	# seed it globally for reproducibility; the same seed also drives the local
+	# MersenneTwister used for the initial guess.
+	seed = 2025
+	Random.seed!(seed)
 	# Define the Rastrigin function
 	function rastrigin(x)
 	    A = 10
 	    return A * length(x) + sum(xi^2 - A * cos(2 * π * xi) for xi in x)
 	end
-	
+
 	# Set initial guess and bounds
 	N = 2 # dimension
-	rng = MersenneTwister(2025)
+	rng = MersenneTwister(seed)
 	initial_guess = rand(rng, N) * 10 .- 5  # A random guess in the range [-5, 5]
 	lower_bound = -5 * ones(N)  # Lower bound for each dimension
 	upper_bound = 5 * ones(N)   # Upper bound for each dimension
 	
-	# Run PSO
+	# Run PSO (a global method): it takes the box bounds directly.
 	result = optimize(rastrigin, initial_guess, ParticleSwarm(lower=lower_bound, upper=upper_bound, n_particles=100))
-	result_nelder = optimize(rastrigin, initial_guess, NelderMead(lower=lower_bound, upper=upper_bound))
+	# Nelder-Mead is a *local*, derivative-free method. It takes no bounds:
+	# NelderMead() silently ignores lower=/upper= keywords. We therefore run it
+	# unconstrained from the same initial guess, to contrast a local search that
+	# gets trapped with the global PSO search. (For genuine box constraints one
+	# would wrap it as Fminbox(NelderMead()).)
+	result_nelder = optimize(rastrigin, initial_guess, NelderMead())
 	
 	# Display results
 	println("Optimal solution: ", Optim.minimizer(result))
@@ -2066,8 +1968,8 @@ let
 	scatter!([initial_guess[1]], [initial_guess[2]], label="Initial guess", color=:black, marker=:diamond, markersize=8)
 	# Add the PSO result and the objective value to the legend label.
 	scatter!([Optim.minimizer(result)[1]], [Optim.minimizer(result)[2]], label="PSO solution ($(Optim.minimum(result)))", color=:red, marker=:cross, markersize=8)
-	# Add the Nelder-Mead result
-	scatter!([Optim.minimizer(result_nelder)[1]], [Optim.minimizer(result_nelder)[2]], label="Nelder-Mead Solution ($(round(Optim.minimum(result_nelder), digits=2)))", color=:gray, marker=:hexagon, markersize=8)
+	# Add the unconstrained (local) Nelder-Mead result
+	scatter!([Optim.minimizer(result_nelder)[1]], [Optim.minimizer(result_nelder)[2]], label="Nelder-Mead local ($(round(Optim.minimum(result_nelder), digits=2)))", color=:gray, marker=:hexagon, markersize=8)
 	plot!(title="PSO Solution", xlabel="X coordinate", ylabel="Y coordinate")
 end
 
@@ -2361,7 +2263,7 @@ md"""
 	  ```math
 	  S_{hj}(\omega) = \frac{P_h}{4\pi d_{hj}^2} \kappa(\omega),
 	  ```
-	  where ``P_h`` is the power transmitted from jammer ``h``, ``d_{hj}`` is the distance between the jammer and the EWR, and ``\kappa(\omega)`` is an [atmospheric ducting](https://en.wikipedia.org/wiki/Atmospheric_duct) multiplier. ``\kappa(\omega)`` follows a [log-normal distribution](https://en.wikipedia.org/wiki/Log-normal_distribution), centered on ``0``, with a standard deviation of ``0.25``;
+	  where ``P_h`` is the power transmitted from jammer ``h``, ``d_{hj}`` is the distance between the jammer and the EWR, and ``\kappa(\omega)`` is an [atmospheric ducting](https://en.wikipedia.org/wiki/Atmospheric_duct) multiplier. ``\kappa(\omega)`` follows a [log-normal distribution](https://en.wikipedia.org/wiki/Log-normal_distribution), whose natural logarithm is normally distributed with mean ``0`` and standard deviation ``0.25`` (so ``\kappa`` is positive with median ``1``);
 	* The jammers have a limited amount of fuel (7 tonnes). For a specific loiter point for asset ``h``, the fuel consumption can be modelled as follows:
 	  ```math
 	  F_h = 1.2 + 0.006 d_h + 2 P_h^{1.3},
@@ -2616,6 +2518,7 @@ md"""
 # ╠═b1144ca2-087c-4ba7-ae77-ae9b6073a642
 # ╠═102e0051-dbfb-45e0-871d-db0a0d07abb1
 # ╠═86e70877-1f9c-4634-9f5a-94659bfab519
+# ╟─9089f56d-805b-4654-861d-65359972a72e
 # ╟─d4b05c5e-ac08-4a69-b54c-5d825d864bfa
 # ╟─1450d898-5e03-4b54-a1ba-bf3d0f659d25
 # ╟─9e9a1b5c-a78f-414c-b99e-328e96061542
