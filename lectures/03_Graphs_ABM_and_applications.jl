@@ -121,13 +121,13 @@ begin
 		boids::Vector{Boid} 			 # holds the boids
 		velocity_buffer::Matrix{Float64} # buffer to hold updated velocities of the birds
 		@doc"""
-    BoidSim(num_boids::Int=10, max_speed=1., field_of_view=5., cohesion_weight=1., alignment_weight=1., separation_weight=1.,  separation_dist=1., box_size=100., seed=161)
+    BoidSim(num_boids::Int=10, max_speed=1., field_of_view=5., cohesion_weight=1., alignment_weight=1., separation_weight=1.,  separation_dist=field_of_view/3, box_size=100., seed=161)
 	
 Representation of a boid simulation state with reflective boundaries.
 		"""
 		function BoidSim(; num_boids::Int=10, max_speed=1., field_of_view=5., cohesion_weight=1., alignment_weight=1., separation_weight=1.,  separation_dist=field_of_view/3, box_size=100., seed=161)
 			# initiate random number generator (for reproducibility)
-			rng = Random.MersenneTwister(42)
+			rng = Random.MersenneTwister(seed)
 			boids = Vector{Boid}(undef, num_boids)
 			for i in 1:num_boids
 				# generate random position in box
@@ -653,7 +653,7 @@ In the example below, we proceed as follows:
 
 # ╔═╡ 071809df-ba36-4e88-b958-b3ca160e04f0
 let
-	G = barabasi_albert(20000, 2)
+	G = barabasi_albert(20000, 2, seed=161)
 	d = degree(G)
 	# finding the scale-free property
 	sorted_d = sort(d)
@@ -662,7 +662,7 @@ let
 	P_greater_d = Float64[]
 	# durations part
 	for x in unique_d[1:end-1]
-		push!(P_greater_d, sum(unique_d .> x) / n_d)
+		push!(P_greater_d, count(>(x), d) / n_d)
 	end
 	
 	# fit regression type x^(-alpha) line for degrees larger than 20
@@ -676,9 +676,9 @@ let
 	
 	scatter(unique_d[1:end-1], P_greater_d, xscale=:log10, yscale=:log10, label="ccdf(degree)")
 	plot!(x_fit, 10 .^(b[2] .* log10.(x_fit) .+ b[1]), color=:blue, alpha=0.5, label=@sprintf("power law fit (α = %.2f)",-(b[2]-1)), legendposition=:bottomleft)
-	ylims!(1e-5, 1e-2)
+	ylims!(1e-5, 1e0)
 	xlabel!("degree")
-	ylabel!("P(D<d)")
+	ylabel!("P(D>d)")
 	title!("barabasi-albert network\n(20,000 nodes, 2 preferential attachments)")
 end
 
@@ -698,7 +698,7 @@ Epidemic spreading models how diseases propagate through a population or network
 	In an SIR model, the population members (agents), can be in one of three states:
 	- S (Susceptible): individuals who can contract the disease.
 	- I (Infected): individuals who have the disease and can spread it.
-	- R (Recovered: individuals who have recovered and are immune (or removed, e.g., deceased).
+	- R (Recovered): individuals who have recovered and are immune (or removed, e.g., deceased).
 	
 	The model allows for the following transitions: 
 	- Infection process: ``S \mapsto I``.
@@ -739,48 +739,65 @@ begin
 end
 
 # ╔═╡ 3a45995d-ce17-4264-b2f5-631f00231421
-@doc raw"""
-	sir_network(g, β::Float64, γ::Float64, steps::Int, patient_zero::Int, states = fill('S', nv(g)) )
+begin
+	@doc raw"""
+		sir_network([rng, ] g, β::Float64, γ::Float64, steps::Int, patient_zero::Int, initial_states = fill('S', nv(g)) )
 
-Models a SIR infection process on a graph `g` for a number of `steps`, starting with a single `patient_zero`. The parameters ``\beta`` and ``\gamma`` represent the infection and recovery probabilities respectively. The function returns a count vector at each time step for each of the states. By default, all nodes start susceptible (except for patient zero).
-"""
-function sir_network(g, β::Float64, γ::Float64, steps::Int, patient_zero::Int, initial_states = fill('S', nv(g)) )
-    n = nv(g)  					# Number of nodes
-	states = copy(initial_states)
-	states[patient_zero] = 'I' 	# patient zero is the only infected person
-	outstates = fill(' ', n, steps+1)
-	outstates[:, 1] .= states
-    
-    # get counts
-    S_count = [count(==('S'), states)]
-    I_count = [count(==('I'), states)]
-    R_count = [count(==('R'), states)]
-    
-    for t in 1:steps
-        new_states = copy(states)
-        for i in 1:n
-            if states[i] == 'I' 
-				# Infected node tries to spread
-                for j in neighbors(g, i)
-                    if states[j] == 'S' && rand() < β
-						# Infection succeeds
-                        new_states[j] = 'I'  
-                    end
-                end
-				# Infected node has a recovery probability
-                if rand() < γ  
-                    new_states[i] = 'R'
-                end
-            end
-        end
-        states .= new_states
-        push!(S_count, count(==('S'), states))
-        push!(I_count, count(==('I'), states))
-        push!(R_count, count(==('R'), states))
-		outstates[:, t+1] .= states
-    end
-	
-    return S_count, I_count, R_count, outstates
+	Models a SIR infection process on a graph `g` for a number of `steps`, starting with a single `patient_zero`. The parameters ``\beta`` and ``\gamma`` represent the infection and recovery probabilities respectively. By default, all nodes start susceptible (except for patient zero).
+
+	The function returns the susceptible, infected and recovered count vectors at each time step, together with the per-step state matrix `outstates` (a `Char` matrix of size `nv(g) × (steps+1)`).
+
+	The first argument `rng::AbstractRNG` makes the stochastic updates reproducible; when it is omitted the global RNG is used.
+	"""
+	function sir_network(rng::AbstractRNG, g, β::Float64, γ::Float64, steps::Int, patient_zero::Int, initial_states = fill('S', nv(g)) )
+	    n = nv(g)  					# Number of nodes
+		states = copy(initial_states)
+		states[patient_zero] = 'I' 	# patient zero is the only infected person
+		outstates = fill(' ', n, steps+1)
+		outstates[:, 1] .= states
+
+	    # get counts
+	    S_count = [count(==('S'), states)]
+	    I_count = [count(==('I'), states)]
+	    R_count = [count(==('R'), states)]
+
+	    for t in 1:steps
+	        new_states = copy(states)
+	        for i in 1:n
+	            if states[i] == 'I'
+					# Infected node tries to spread
+	                for j in neighbors(g, i)
+	                    if states[j] == 'S' && rand(rng) < β
+							# Infection succeeds
+	                        new_states[j] = 'I'
+	                    end
+	                end
+					# Infected node has a recovery probability
+	                if rand(rng) < γ
+	                    new_states[i] = 'R'
+	                end
+	            end
+	        end
+	        states .= new_states
+	        push!(S_count, count(==('S'), states))
+	        push!(I_count, count(==('I'), states))
+	        push!(R_count, count(==('R'), states))
+			outstates[:, t+1] .= states
+	    end
+
+	    return S_count, I_count, R_count, outstates
+	end
+
+	# convenience method: fall back to the global RNG when no rng is supplied
+	sir_network(g, β::Float64, γ::Float64, steps::Int, patient_zero::Int, initial_states = fill('S', nv(g))) = sir_network(Random.default_rng(), g, β, γ, steps, patient_zero, initial_states)
+end
+
+# ╔═╡ b493523c-69ab-4e33-a0aa-0018d06cac40
+begin
+	# Reproducible RNG for the network experiments (house convention).
+	# Offset seeds (e.g. graph_rng(GRAPH_SEED + i)) keep each replication reproducible.
+	const GRAPH_SEED = 300
+	graph_rng(seed::Integer=GRAPH_SEED) = Random.MersenneTwister(seed)
 end
 
 # ╔═╡ d87a2a77-b1a8-4c30-bae4-46577c69c238
@@ -845,15 +862,16 @@ md"""
 
 # ╔═╡ 24dbd835-d044-40ff-bef1-380745f8266c
 let
-	G = stochastic_block_model([5 1 2;0 4 1; 0 0 10], [300; 200; 100])
+	G = stochastic_block_model([5 1 2;0 4 1; 0 0 10], [300; 200; 100], seed=GRAPH_SEED)
 	m = 10
 	β = 0.1
 	γ = 0.5
 	n = 100
 	infected_counts = zeros(Int, nv(G), m)
 	Threads.@threads for i in 1:nv(G)
+		rng = graph_rng(GRAPH_SEED + i)
 		for j = 1:m
-			SC,IC,RC = sir_network(G, β, γ, n, i)
+			SC,IC,RC = sir_network(rng, G, β, γ, n, i)
 			infected_counts[i, j] = maximum(IC)
 		end
 	end
@@ -870,12 +888,12 @@ md"""
 > Experiment:
 > 1. Vaccinate nodes, i.e. make them start in state ``R``.
 > 2. Consider the peak infection value using the same patient zero each time
-> 3. Start vaccination with the node with the highest degree or betweenness centrality, and increase the number of vaccinated people
+> 3. Start vaccination with the node with the highest betweenness centrality, and increase the number of vaccinated people
 """
 
 # ╔═╡ b562447b-7350-4c30-82cd-66dd410852af
 begin
-	GG = stochastic_block_model([5 1 2;0 4 1; 0 0 10], [300; 200; 100])
+	GG = stochastic_block_model([5 1 2;0 4 1; 0 0 10], [300; 200; 100], seed=GRAPH_SEED)
 	# determine order for vaccinating
 	cent_vals = betweenness_centrality(GG)
 	vaccination_prio_list = sortperm(cent_vals, rev=true)
@@ -889,25 +907,39 @@ begin
 	m = 30 # numer of runs per setting
 	infected_counts = zeros(Int, max_vaccination+1, m)
 	# no vaccination
+	rng0 = graph_rng(GRAPH_SEED)
 	for j = 1:m
-		SC,IC,RC = sir_network(GG, β, γ, n, patient_zero)
+		SC,IC,RC = sir_network(rng0, GG, β, γ, n, patient_zero)
 		infected_counts[1, j] = maximum(IC)
 	end
 	
 	# increasing number of vaccinations
 	Threads.@threads for i in 1:max_vaccination
+		rng = graph_rng(GRAPH_SEED + i)
 		states = fill('S', nv(GG))
 		states[vaccination_prio_list[1:i]] .= 'R'
 		for j = 1:m
-			SC,IC,RC = sir_network(GG, β, γ, n, patient_zero, states)
+			SC,IC,RC = sir_network(rng, GG, β, γ, n, patient_zero, states)
 			infected_counts[i+1, j] = maximum(IC)
 		end
 	end
 	infected_mean = vec(mean(infected_counts, dims=2) )
 
 	# illustration
-	scatter( (0:max_vaccination) ./ nv(GG) , infected_mean ./ nv(GG), xlabel="Proportion of vaccinated people", ylabel="Peak infection level\n[proportion of population]", label="", xlims=(0, 0.75), alpha=0.5, title="Vaccination based on betweenness similarity") 
+	scatter( (0:max_vaccination) ./ nv(GG) , infected_mean ./ nv(GG), xlabel="Proportion of vaccinated people", ylabel="Peak infection level\n[proportion of population]", label="", xlims=(0, 0.75), alpha=0.5, title="Vaccination based on betweenness centrality")
 end
+
+# ╔═╡ 98fc946b-57b6-4930-ae04-2a5681252532
+md"""
+!!! note "Interpretation"
+	Two lessons emerge from these experiments:
+
+	1. **Patient zero matters.** The median peak infection grows with the degree and betweenness centrality of the initial case: a well-connected seed reaches the rest of the network along many short paths, so it triggers a larger outbreak. Seeding the epidemic at a peripheral node keeps the peak low.
+
+	2. **Targeted vaccination is efficient.** Vaccinating the highest-betweenness nodes first lowers the peak infection level far quicker than the vaccinated fraction alone would suggest: removing a handful of bridges fragments the transmission network. This is the network analogue of protecting "super-spreaders" instead of vaccinating at random.
+
+	Keep in mind that this is a *modelling* result. It rests on the assumption that the contact structure is well described by our stochastic block model graph and that ``\beta`` and ``\gamma`` are constant and homogeneous. Whether these conclusions carry over to a real epidemic is a **validation** question that can only be settled by confronting the model with data.
+"""
 
 # ╔═╡ Cell order:
 # ╟─590d74fd-3143-4676-92e8-5e9a24092c29
@@ -943,6 +975,7 @@ end
 # ╟─378ceb57-6639-4e3c-b9e3-886df99ff735
 # ╟─050f4689-51f9-4f3a-aec6-8627a223a29a
 # ╠═3a45995d-ce17-4264-b2f5-631f00231421
+# ╠═b493523c-69ab-4e33-a0aa-0018d06cac40
 # ╟─d87a2a77-b1a8-4c30-bae4-46577c69c238
 # ╟─36ee5b02-1f3c-4feb-be5c-54fb3c98c69c
 # ╟─65a3f3c7-af4b-4998-a5f7-067b1bef14cc
@@ -953,3 +986,4 @@ end
 # ╟─24dbd835-d044-40ff-bef1-380745f8266c
 # ╟─c6cc5a17-6775-4df5-8d6b-a1646ad69a25
 # ╠═b562447b-7350-4c30-82cd-66dd410852af
+# ╟─98fc946b-57b6-4930-ae04-2a5681252532
