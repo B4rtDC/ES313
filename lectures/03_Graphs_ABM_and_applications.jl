@@ -36,7 +36,7 @@ begin
 	using Plots
 	using Printf   # for fancy text rendering
 	using Random
-	using LinearAlgebra
+	using LinearAlgebra: norm
 	using Statistics
 end
 
@@ -64,7 +64,7 @@ md"""
 
 Examples:
 * A virtual ant colony, where each ant has simple instructions such as following pheromone trails when foraging. Although no explicit information is given related to pathfinding, organically, "ant highways" will arise.
-* Traffic flows can also be studied in this framework: by imposing simple rules on accelaration, decelaration, and overtaking, realistic traffic jams will start to appear in the simulation.
+* Traffic flows can also be studied in this framework: by imposing simple rules on acceleration, deceleration, and overtaking, realistic traffic jams will start to appear in the simulation.
 
 """
 
@@ -121,13 +121,13 @@ begin
 		boids::Vector{Boid} 			 # holds the boids
 		velocity_buffer::Matrix{Float64} # buffer to hold updated velocities of the birds
 		@doc"""
-    BoidSim(num_boids::Int=10, max_speed=1., field_of_view=5., cohesion_weight=1., alignment_weight=1., separation_weight=1.,  separation_dist=1., box_size=100., seed=161)
+    BoidSim(num_boids::Int=10, max_speed=1., field_of_view=5., cohesion_weight=1., alignment_weight=1., separation_weight=1.,  separation_dist=field_of_view/3, box_size=100., seed=161)
 	
 Representation of a boid simulation state with reflective boundaries.
 		"""
 		function BoidSim(; num_boids::Int=10, max_speed=1., field_of_view=5., cohesion_weight=1., alignment_weight=1., separation_weight=1.,  separation_dist=field_of_view/3, box_size=100., seed=161)
 			# initiate random number generator (for reproducibility)
-			rng = Random.MersenneTwister(42)
+			rng = Random.MersenneTwister(seed)
 			boids = Vector{Boid}(undef, num_boids)
 			for i in 1:num_boids
 				# generate random position in box
@@ -330,10 +330,10 @@ There even exists an entire Julia package focussing entirely on Agent Based Mode
 
 # ╔═╡ 42bc0402-149f-11f0-22d3-295f5dfa2ca9
 md"""# Networks and graphs
-Many real-world systems can be represented as (potentially different) entities that are connected in some way to one another. We often call this a network. Examples include social networks, transportation networks, computer networks, biological networks.
+Many real-world systems can be represented as entities that are connected in some way to one another. We often call this real-world structure a network. Examples include social networks, transportation networks, computer networks, biological networks, energy grids and supply chains.
 
 !!! info "Network"
-	While often used interchangeably with "graph", it typically refers to a real-world system of interacting entities
+	While often used interchangeably with "graph", it typically refers to a real-world system of interacting entities.
     
 
 !!! info "Graph"
@@ -342,8 +342,12 @@ Many real-world systems can be represented as (potentially different) entities t
 	Notation: ``G = (V, E)`` where ``V`` is the set of vertices and ``E`` is the set of edges.
 
 Graphs basics:
-* A graph can also be represented by its adjacency matrix ``A``, where a non-zero value ``a_{ij}`` represents that a connection from node ``i`` to ``j`` is present (note how this implies that a graph can be directional). 
-* Edges can also have weights (typically positive weights, altough negative weighted graphs are definined, but handling these is not straightforward)
+* A graph can be undirected (connections work both ways) or directed (connections have an orientation).
+* A graph can be unweighted (an edge is present or absent) or weighted (edges carry a cost, distance, capacity, similarity, probability, ...).
+* A graph can also be represented by its adjacency matrix ``A``, where a non-zero value ``a_{ij}`` represents that a connection from node ``i`` to ``j`` is present.
+* For weighted graphs, the value ``a_{ij}`` is the edge weight. Most shortest-path algorithms assume non-negative weights. Negative weights are mathematically possible, but need different algorithms and more care.
+
+The modelling choice matters: in a road network, edge weights may be travel time; in a friendship network, an edge may simply mean "knows"; in an infection network, an edge can mean "can transmit".
 
 Some examples:
 """
@@ -381,6 +385,30 @@ let
 	
 end
 
+# ╔═╡ 248569af-646b-464f-8026-5d20800a8c54
+md"""
+## Graph representations in Julia
+
+The `Graphs.jl` package stores graphs as graph objects, but we can move between common representations:
+* an edge list is compact and easy to write down;
+* an adjacency matrix is useful for linear-algebra-style reasoning;
+* a graph object is usually the most convenient form for algorithms.
+"""
+
+# ╔═╡ 5aaa5580-e58f-4b06-8429-5bc40500de3a
+let
+	edge_list = Edge.([(1, 2), (1, 3), (2, 4), (3, 4), (4, 5)])
+	G = SimpleGraphFromIterator(edge_list)
+	A = adjacency_matrix(G)
+	@info "edge list" collect(edges(G))
+	@info "adjacency matrix" Matrix(A)
+	@info "basic size" vertices=nv(G) edges=ne(G) density=Graphs.density(G)
+
+	gplot(G, nodelabel=1:nv(G), background_color="white", plot_size=(8cm, 8cm),
+		  title="same graph, object representation",
+		  edgestrokec="black", nodefillc=colorant"rgba(50,50,250,0.4)")
+end
+
 # ╔═╡ 1b303b0a-b9e7-453f-b2aa-2e395fd37619
 md"""
 ## Graph metrics
@@ -395,7 +423,11 @@ Graph metrics are values we can compute on node, meso, or graph level that allow
         *   Out-degree, ``k_{out}``: number of edges pointing away from the node.
         *   Total degree: ``k = k_{in} + k_{out}``
 
+!!! note "Density"
+	The density of a graph is the fraction of possible edges that are present. Dense graphs have many connections; sparse graphs have relatively few. Many engineering networks are sparse: the number of edges grows roughly proportional to the number of nodes, not to ``n^2``.
 
+!!! note "Clustering"
+	Clustering measures how often neighbors of a node are also connected to each other. High clustering is typical in social networks: if two people both know the same person, they are more likely to know each other.
 
 """
 
@@ -422,6 +454,23 @@ let
 		 edgestrokec="black", nodefillc=colorant"rgba(50,50,250,0.4)", nodesize=node_size_in)
 end
 
+# ╔═╡ 491f1d2c-1a2f-4033-a5ae-64445f135184
+let
+	G = SimpleGraph(6)
+	for e in [(1, 2), (1, 3), (2, 3), (3, 4), (4, 5), (4, 6), (5, 6)]
+		add_edge!(G, e...)
+	end
+
+	node_clustering = local_clustering_coefficient(G)
+	@info "graph-level metrics" density=Graphs.density(G) global_clustering=global_clustering_coefficient(G)
+	@info "node-level clustering" node_clustering
+
+	gplot(G, nodelabel=1:nv(G), background_color="white", plot_size=(8cm, 8cm),
+		  title="local clustering",
+		  edgestrokec="black", nodefillc=colorant"rgba(50,50,250,0.4)",
+		  nodesize=1 .+ 4 .* node_clustering)
+end
+
 # ╔═╡ a94dfec9-4f6d-4ac1-b639-4f3403e0fb7f
 md"""
 !!! note "Path"
@@ -431,6 +480,8 @@ md"""
 	* A cycle is a path where the start and end vertices are the same .
 	* A simple path has no repeated vertices (except possibly the start and end in a cycle).
 	
+!!! note "Shortest path"
+	A shortest path is a path with minimum length or minimum total weight. For unweighted graphs, length is usually the number of edges. For weighted graphs, the interpretation of the weight matters: a large weight can mean high cost, long distance or low desirability depending on how the model was built.
 
 
 !!! note "Component"
@@ -441,6 +492,25 @@ md"""
 
 
 """
+
+# ╔═╡ efeabf7f-5509-465c-ae31-d007ee12f005
+let
+	Gw = SimpleWeightedGraph(5)
+	add_edge!(Gw, 1, 2, 2.0)
+	add_edge!(Gw, 1, 3, 8.0)
+	add_edge!(Gw, 2, 3, 1.0)
+	add_edge!(Gw, 2, 4, 5.0)
+	add_edge!(Gw, 3, 4, 1.0)
+	add_edge!(Gw, 4, 5, 3.0)
+
+	sp = dijkstra_shortest_paths(Gw, 1)
+	@info "shortest-path distances from node 1" sp.dists
+
+	gplot(Gw, nodelabel=1:nv(Gw), background_color="white", plot_size=(8cm, 8cm),
+		  title="weighted graph for shortest paths",
+		  edgestrokec="black", nodefillc=colorant"rgba(50,50,250,0.4)",
+		  edgelinewidth=[e.weight for e in edges(Gw)])
+end
 
 # ╔═╡ 571b3127-defa-410a-a3ac-0cb140df033b
 let
@@ -494,7 +564,14 @@ end
 
 # ╔═╡ 3098c8fe-4ba7-4290-ae2f-118d9e50fa9d
 md"""
-!!! note "Betweennes Centrality"
+!!! note "Centrality"
+	Centrality measures try to answer "which nodes matter most?", but each measure makes a different assumption about what "matters" means.
+
+	* Degree centrality: important nodes have many direct connections.
+	* Closeness centrality: important nodes are, on average, close to all other nodes.
+	* Betweenness centrality: important nodes sit on many shortest paths and can act as bridges.
+
+!!! note "Betweenness centrality"
 	Betweenness centrality measures the importance of a vertex (or edge) in a graph based on how often it lies on the shortest paths between pairs of other vertices. It quantifies the extent to which a vertex acts as a "bridge" in the network.
 
 	Formally, for a vertex `` v `` in a graph `` G = (V, E) `` the betweenness centrality `` C_B(v) `` is defined as:
@@ -504,7 +581,7 @@ md"""
 	```
 	where `` \sigma_{st} `` represents the total number of shortest paths from vertex `` s `` to vertex `` t ``, and ``\sigma_{st}(v) `` represents the  number of those shortest paths that pass through vertex ``v.`` The sum is taken over all pairs of vertices `` s, t \in V `` (excluding `` v ``).
 
-	- High betweenness centrality indicates a vertex is critical for connecting different parts of the graph. When evaluating node importance using this metric, you implicitely assume that the shortest path will be used to travel between nodes, which is not necessarily true in all applications.
+	- High betweenness centrality indicates a vertex is critical for connecting different parts of the graph. When evaluating node importance using this metric, you implicitly assume that the shortest path will be used to travel between nodes, which is not necessarily true in all applications.
 	- It applies to both undirected and directed graphs, and can be computed for edges as well.
 	- For disconnected, directed graphs: betweenness only reflects intra-component paths, ignoring the broader network. This can lead to a situation where high betweenness in one component might dwarf scores in another. Misinterpreting betweenness without considering connectivity could lead to overlooking key nodes or bottlenecks in specific subnetworks.
 """
@@ -523,27 +600,49 @@ end
 # ╔═╡ 556daa75-47ca-4e71-abac-4610ec9cf8b8
 md"""
 ## Graph models
-There are many approaches to building a network, and some of these models are detailed below
+There are many approaches to building a network. The correct model depends on which real-world mechanism you want to represent.
+
+!!! tip "Erdos-Renyi model"
+	Underlying principle: every possible edge is independently present with probability ``p``. This is a useful baseline, but it usually does not reproduce hubs or community structure very well.
+
 !!! tip "Barabási–Albert model"
-	Underlying principle: grow the network through preferential attachment, i.e. a new node always has $m$ neighbors. The neigbors are chosen at random, but proportional to the node's degree
+	Underlying principle: grow the network through preferential attachment, i.e. a new node always has ``m`` neighbors. The neighbors are chosen at random, but proportional to the node's degree
 	```math
 	p_i = \frac{d_i}{\sum_j d_j}
 	```
 
-	It can be shown that the degree distribution of such a network follows a power law with coeffient ``\alpha = 3``
+	It can be shown that the degree distribution of such a network follows a power law with coefficient ``\alpha = 3``.
 
 	This network model has been used to explain real world processes and model the internet.
+
+!!! tip "Stochastic block model"
+	Underlying principle: nodes belong to groups, and the probability of an edge depends on the groups of the two nodes. This is a natural model for communities or modules.
+
+!!! tip "Configuration model"
+	Underlying principle: preserve a desired degree sequence and randomize the wiring. This is useful when you want to compare an observed network to a random network with the same node degrees.
 
 Illustration of the Barabási–Albert model ([source](https://networksciencebook.com/chapter/5#growth)):
 $(LocalResource("./lectures/img/barabasi_albert_growth.jpg"))
 
 """
 
+# ╔═╡ 2d287e2f-a5fa-44b3-981b-ca4876893de8
+let
+	G_er = erdos_renyi(80, 0.06, seed=161)
+	G_ba = barabasi_albert(80, 2, seed=161)
+
+	p1 = histogram(degree(G_er), bins=0:maximum(degree(G_er)), label="", xlabel="degree",
+				   ylabel="number of nodes", title="Erdos-Renyi")
+	p2 = histogram(degree(G_ba), bins=0:maximum(degree(G_ba)), label="", xlabel="degree",
+				   ylabel="number of nodes", title="Barabasi-Albert")
+	plot(p1, p2, size=(800, 350), bottom_margin=3mm, left_margin=3mm)
+end
+
 # ╔═╡ ad23fe31-c3a1-4537-8613-f40e9aefddf5
 md"""
 While we will not go into detail on the theoretical aspect of the power law, we can try to confirm it through an experiment.
 
-Our starting hypothesis is that the degree distribution of out Barabási–Albert graph follows a power law, i.e. ``p(x=k) = C x^{-\alpha}``
+Our starting hypothesis is that the degree distribution of our Barabási–Albert graph follows a power law, i.e. ``p(x=k) = C x^{-\alpha}``
 
 
 In the example below, we proceed as follows:
@@ -554,7 +653,7 @@ In the example below, we proceed as follows:
 
 # ╔═╡ 071809df-ba36-4e88-b958-b3ca160e04f0
 let
-	G = barabasi_albert(200000, 2)
+	G = barabasi_albert(20000, 2, seed=161)
 	d = degree(G)
 	# finding the scale-free property
 	sorted_d = sort(d)
@@ -563,11 +662,11 @@ let
 	P_greater_d = Float64[]
 	# durations part
 	for x in unique_d[1:end-1]
-		push!(P_greater_d, sum(unique_d .> x) / n_d)
+		push!(P_greater_d, count(>(x), d) / n_d)
 	end
 	
-	# fit regression type x^(-\alpha) line for durations larger than 10^2
-    mask = unique_d[1:end-1] .> 100
+	# fit regression type x^(-alpha) line for degrees larger than 20
+    mask = unique_d[1:end-1] .> 20
     x_fit = unique_d[1:end-1][mask]
     y_fit = P_greater_d[mask]
     # Simple linear regression in log-log space: log(y) = -α * log(x) + c
@@ -577,26 +676,15 @@ let
 	
 	scatter(unique_d[1:end-1], P_greater_d, xscale=:log10, yscale=:log10, label="ccdf(degree)")
 	plot!(x_fit, 10 .^(b[2] .* log10.(x_fit) .+ b[1]), color=:blue, alpha=0.5, label=@sprintf("power law fit (α = %.2f)",-(b[2]-1)), legendposition=:bottomleft)
-	ylims!(1e-5, 1e-3)
+	ylims!(1e-5, 1e0)
 	xlabel!("degree")
-	ylabel!("P(D<d)")
-	title!("barabasi-albert network\n(200,000 nodes, 2 preferential attachments)")
+	ylabel!("P(D>d)")
+	title!("barabasi-albert network\n(20,000 nodes, 2 preferential attachments)")
 end
 
 # ╔═╡ 6b93d24f-eefd-488c-b181-61aaec36c506
 md"""
-
-!!! tip "Erdős-Rényi model"
-	Underlying principle: we have a network of size ``n``, every possible edge in the network is either present or not with a probability ``p``.
-
-	*Note: there is also a version where the number of nodes and the number of edges is fixed.*
-
-!!! tip "Configuration model"
-	This random graph model that allows to create a graph that hase the same degree sequence as an observed graph. In practice this is done by switching edges.
-
-	*Note: there is a risk of having the same edge occur twice, or having a self-edge.*
-
-There are many other graph models (such as the [stochastic block model](https://en.wikipedia.org/wiki/Stochastic_block_model) used below), and many extensions exist for directed and weighted graphs.
+The graph model is not a neutral technical detail. It encodes assumptions about how interactions are created. In a simulation study, it is often useful to compare results across several graph models: if your conclusion only appears for one very specific network generator, that conclusion may be a property of the generator rather than of the system being studied.
 """
 
 # ╔═╡ 378ceb57-6639-4e3c-b9e3-886df99ff735
@@ -610,7 +698,7 @@ Epidemic spreading models how diseases propagate through a population or network
 	In an SIR model, the population members (agents), can be in one of three states:
 	- S (Susceptible): individuals who can contract the disease.
 	- I (Infected): individuals who have the disease and can spread it.
-	- R (Recovered: individuals who have recovered and are immune (or removed, e.g., deceased).
+	- R (Recovered): individuals who have recovered and are immune (or removed, e.g., deceased).
 	
 	The model allows for the following transitions: 
 	- Infection process: ``S \mapsto I``.
@@ -651,47 +739,65 @@ begin
 end
 
 # ╔═╡ 3a45995d-ce17-4264-b2f5-631f00231421
-@doc raw"""
-	sir_network(g, β::Float64, γ::Float64, steps::Int, patient_zero::Int,states = fill('S', n) )
+begin
+	@doc raw"""
+		sir_network([rng, ] g, β::Float64, γ::Float64, steps::Int, patient_zero::Int, initial_states = fill('S', nv(g)) )
 
-Models a SIR infection process on a graph `g` for a number of `steps`, starting with a single `patient_zero`. The parameters ``\beta`` and ``\gamma`` represent the infection and recovery probabilities respectively. The function returns a count vector at each time step for each of the states. By default, all nodes start susceptible (except for patient zero).
-"""
-function sir_network(g, β::Float64, γ::Float64, steps::Int, patient_zero::Int, states = fill('S', nv(g)) )
-    n = nv(g)  					# Number of nodes
-	states[patient_zero] = 'I' 	# patient zero is the only infected person
-	outstates = fill(' ', n, steps+1)
-	outstates[:, 1] .= states
-    
-    # get counts
-    S_count = [count(==('S'), states)]
-    I_count = [count(==('I'), states)]
-    R_count = [count(==('R'), states)]
-    
-    for t in 1:steps
-        new_states = copy(states)
-        for i in 1:n
-            if states[i] == 'I' 
-				# Infected node tries to spread
-                for j in neighbors(g, i)
-                    if states[j] == 'S' && rand() < β
-						# Infection succeeds
-                        new_states[j] = 'I'  
-                    end
-                end
-				# Infected node has a recovery probability
-                if rand() < γ  
-                    new_states[i] = 'R'
-                end
-            end
-        end
-        states .= new_states
-        push!(S_count, count(==('S'), states))
-        push!(I_count, count(==('I'), states))
-        push!(R_count, count(==('R'), states))
-		outstates[:, t+1] .= states
-    end
-	
-    return S_count, I_count, R_count, outstates
+	Models a SIR infection process on a graph `g` for a number of `steps`, starting with a single `patient_zero`. The parameters ``\beta`` and ``\gamma`` represent the infection and recovery probabilities respectively. By default, all nodes start susceptible (except for patient zero).
+
+	The function returns the susceptible, infected and recovered count vectors at each time step, together with the per-step state matrix `outstates` (a `Char` matrix of size `nv(g) × (steps+1)`).
+
+	The first argument `rng::AbstractRNG` makes the stochastic updates reproducible; when it is omitted the global RNG is used.
+	"""
+	function sir_network(rng::AbstractRNG, g, β::Float64, γ::Float64, steps::Int, patient_zero::Int, initial_states = fill('S', nv(g)) )
+	    n = nv(g)  					# Number of nodes
+		states = copy(initial_states)
+		states[patient_zero] = 'I' 	# patient zero is the only infected person
+		outstates = fill(' ', n, steps+1)
+		outstates[:, 1] .= states
+
+	    # get counts
+	    S_count = [count(==('S'), states)]
+	    I_count = [count(==('I'), states)]
+	    R_count = [count(==('R'), states)]
+
+	    for t in 1:steps
+	        new_states = copy(states)
+	        for i in 1:n
+	            if states[i] == 'I'
+					# Infected node tries to spread
+	                for j in neighbors(g, i)
+	                    if states[j] == 'S' && rand(rng) < β
+							# Infection succeeds
+	                        new_states[j] = 'I'
+	                    end
+	                end
+					# Infected node has a recovery probability
+	                if rand(rng) < γ
+	                    new_states[i] = 'R'
+	                end
+	            end
+	        end
+	        states .= new_states
+	        push!(S_count, count(==('S'), states))
+	        push!(I_count, count(==('I'), states))
+	        push!(R_count, count(==('R'), states))
+			outstates[:, t+1] .= states
+	    end
+
+	    return S_count, I_count, R_count, outstates
+	end
+
+	# convenience method: fall back to the global RNG when no rng is supplied
+	sir_network(g, β::Float64, γ::Float64, steps::Int, patient_zero::Int, initial_states = fill('S', nv(g))) = sir_network(Random.default_rng(), g, β, γ, steps, patient_zero, initial_states)
+end
+
+# ╔═╡ b493523c-69ab-4e33-a0aa-0018d06cac40
+begin
+	# Reproducible RNG for the network experiments (house convention).
+	# Offset seeds (e.g. graph_rng(GRAPH_SEED + i)) keep each replication reproducible.
+	const GRAPH_SEED = 300
+	graph_rng(seed::Integer=GRAPH_SEED) = Random.MersenneTwister(seed)
 end
 
 # ╔═╡ d87a2a77-b1a8-4c30-bae4-46577c69c238
@@ -704,7 +810,7 @@ md"""Evolution over time:"""
 
 # ╔═╡ 65a3f3c7-af4b-4998-a5f7-067b1bef14cc
 begin
-	S,I,R, states = sir_network(G, 0.2, 0.2, 30, 1)
+	S, I, R, states = sir_network(G, 0.2, 0.2, 30, 1)
 	plot(S,label="Susceptible",linetype=:steppost)
 	plot!(I, label="Infected",linetype=:steppost)
 	plot!(R, label="Recovered",linetype=:steppost)
@@ -756,15 +862,16 @@ md"""
 
 # ╔═╡ 24dbd835-d044-40ff-bef1-380745f8266c
 let
-	G = stochastic_block_model([5 1 2;0 4 1; 0 0 10], [300; 200; 100])
+	G = stochastic_block_model([5 1 2;0 4 1; 0 0 10], [300; 200; 100], seed=GRAPH_SEED)
 	m = 10
 	β = 0.1
 	γ = 0.5
 	n = 100
 	infected_counts = zeros(Int, nv(G), m)
 	Threads.@threads for i in 1:nv(G)
+		rng = graph_rng(GRAPH_SEED + i)
 		for j = 1:m
-			SC,IC,RC = sir_network(G, β, γ, n, i)
+			SC,IC,RC = sir_network(rng, G, β, γ, n, i)
 			infected_counts[i, j] = maximum(IC)
 		end
 	end
@@ -781,12 +888,12 @@ md"""
 > Experiment:
 > 1. Vaccinate nodes, i.e. make them start in state ``R``.
 > 2. Consider the peak infection value using the same patient zero each time
-> 3. Start vaccination with the node with the highest degree or betweenness centrality, and increase the number of vaccinated people
+> 3. Start vaccination with the node with the highest betweenness centrality, and increase the number of vaccinated people
 """
 
 # ╔═╡ b562447b-7350-4c30-82cd-66dd410852af
 begin
-	GG = stochastic_block_model([5 1 2;0 4 1; 0 0 10], [300; 200; 100])
+	GG = stochastic_block_model([5 1 2;0 4 1; 0 0 10], [300; 200; 100], seed=GRAPH_SEED)
 	# determine order for vaccinating
 	cent_vals = betweenness_centrality(GG)
 	vaccination_prio_list = sortperm(cent_vals, rev=true)
@@ -800,25 +907,39 @@ begin
 	m = 30 # numer of runs per setting
 	infected_counts = zeros(Int, max_vaccination+1, m)
 	# no vaccination
+	rng0 = graph_rng(GRAPH_SEED)
 	for j = 1:m
-		SC,IC,RC = sir_network(GG, β, γ, n, patient_zero)
+		SC,IC,RC = sir_network(rng0, GG, β, γ, n, patient_zero)
 		infected_counts[1, j] = maximum(IC)
 	end
 	
 	# increasing number of vaccinations
 	Threads.@threads for i in 1:max_vaccination
+		rng = graph_rng(GRAPH_SEED + i)
 		states = fill('S', nv(GG))
 		states[vaccination_prio_list[1:i]] .= 'R'
 		for j = 1:m
-			SC,IC,RC = sir_network(GG, β, γ, n, patient_zero, states)
+			SC,IC,RC = sir_network(rng, GG, β, γ, n, patient_zero, states)
 			infected_counts[i+1, j] = maximum(IC)
 		end
 	end
 	infected_mean = vec(mean(infected_counts, dims=2) )
 
 	# illustration
-	scatter( (0:max_vaccination) ./ nv(GG) , infected_mean ./ nv(GG), xlabel="Proportion of vaccinated people", ylabel="Peak infection level\n[proportion of population]", ylims=(0, 0.04), label="", xlims=(0, 0.75), alpha=0.5, title="Vaccination based on betweenness similarity")
+	scatter( (0:max_vaccination) ./ nv(GG) , infected_mean ./ nv(GG), xlabel="Proportion of vaccinated people", ylabel="Peak infection level\n[proportion of population]", label="", xlims=(0, 0.75), alpha=0.5, title="Vaccination based on betweenness centrality")
 end
+
+# ╔═╡ 98fc946b-57b6-4930-ae04-2a5681252532
+md"""
+!!! note "Interpretation"
+	Two lessons emerge from these experiments:
+
+	1. **Patient zero matters.** The median peak infection grows with the degree and betweenness centrality of the initial case: a well-connected seed reaches the rest of the network along many short paths, so it triggers a larger outbreak. Seeding the epidemic at a peripheral node keeps the peak low.
+
+	2. **Targeted vaccination is efficient.** Vaccinating the highest-betweenness nodes first lowers the peak infection level far quicker than the vaccinated fraction alone would suggest: removing a handful of bridges fragments the transmission network. This is the network analogue of protecting "super-spreaders" instead of vaccinating at random.
+
+	Keep in mind that this is a *modelling* result. It rests on the assumption that the contact structure is well described by our stochastic block model graph and that ``\beta`` and ``\gamma`` are constant and homogeneous. Whether these conclusions carry over to a real epidemic is a **validation** question that can only be settled by confronting the model with data.
+"""
 
 # ╔═╡ Cell order:
 # ╟─590d74fd-3143-4676-92e8-5e9a24092c29
@@ -836,19 +957,25 @@ end
 # ╟─42bc0402-149f-11f0-22d3-295f5dfa2ca9
 # ╟─d01f1f2e-af33-417f-b6cc-894d95f56c15
 # ╟─44b81a7f-a7b7-4a2f-8c55-3c495cb5a9cc
+# ╟─248569af-646b-464f-8026-5d20800a8c54
+# ╠═5aaa5580-e58f-4b06-8429-5bc40500de3a
 # ╟─1b303b0a-b9e7-453f-b2aa-2e395fd37619
-# ╟─295b1f30-641a-4941-863d-854acd2a27c7
+# ╠═295b1f30-641a-4941-863d-854acd2a27c7
+# ╠═491f1d2c-1a2f-4033-a5ae-64445f135184
 # ╟─a94dfec9-4f6d-4ac1-b639-4f3403e0fb7f
+# ╠═efeabf7f-5509-465c-ae31-d007ee12f005
 # ╟─571b3127-defa-410a-a3ac-0cb140df033b
 # ╟─3098c8fe-4ba7-4290-ae2f-118d9e50fa9d
 # ╟─04b96931-2140-42d5-8e93-0ebd9e835e91
 # ╟─556daa75-47ca-4e71-abac-4610ec9cf8b8
+# ╟─2d287e2f-a5fa-44b3-981b-ca4876893de8
 # ╟─ad23fe31-c3a1-4537-8613-f40e9aefddf5
 # ╟─071809df-ba36-4e88-b958-b3ca160e04f0
 # ╟─6b93d24f-eefd-488c-b181-61aaec36c506
 # ╟─378ceb57-6639-4e3c-b9e3-886df99ff735
 # ╟─050f4689-51f9-4f3a-aec6-8627a223a29a
 # ╠═3a45995d-ce17-4264-b2f5-631f00231421
+# ╠═b493523c-69ab-4e33-a0aa-0018d06cac40
 # ╟─d87a2a77-b1a8-4c30-bae4-46577c69c238
 # ╟─36ee5b02-1f3c-4feb-be5c-54fb3c98c69c
 # ╟─65a3f3c7-af4b-4998-a5f7-067b1bef14cc
@@ -856,6 +983,7 @@ end
 # ╟─22bca145-f783-48e2-b83f-4d3d9842a5fc
 # ╟─748fca52-aad0-4411-a510-b080a1a24c67
 # ╟─c8be9549-f8de-4a07-8d4f-6cd51a0d45f0
-# ╠═24dbd835-d044-40ff-bef1-380745f8266c
+# ╟─24dbd835-d044-40ff-bef1-380745f8266c
 # ╟─c6cc5a17-6775-4df5-8d6b-a1646ad69a25
 # ╠═b562447b-7350-4c30-82cd-66dd410852af
+# ╟─98fc946b-57b6-4930-ae04-2a5681252532

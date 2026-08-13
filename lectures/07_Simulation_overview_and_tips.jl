@@ -9,12 +9,14 @@ begin
 	# Pkg needs to be used to force Pluto to use the current project instead of making an environment for each notebook
 	using Pkg
 	# this is redundant if you run it through start.jl, but to make sure...
-	cd(joinpath(dirname(@__FILE__),".."))
+	course_root = normpath(joinpath(dirname(@__FILE__), ".."))
+	cd(course_root)
     Pkg.activate(pwd())
 
 	# the source file
-	include("./lectures/DES_spt.jl")
-	txt = readlines("./lectures/DES_spt.jl")
+	des_support_file = joinpath(course_root, "lectures", "DES_spt.jl")
+	include(des_support_file)
+	txt = readlines(des_support_file)
 	
 	# helper function to find code for a function in the spt file
 	function function_source_extractor(src, target)
@@ -38,10 +40,14 @@ begin
 	using ConcurrentSim
 	using Logging
 
+	using BenchmarkTools
 	using Distributions
 	using Plots
+	using Random
+	using Statistics
 	using StatsPlots
 	using LaTeXStrings
+	using DataFrames
 	using Measures            # For fine-grained plot control 
 end
 
@@ -57,6 +63,20 @@ html"""
 	}
 </style>
 """
+
+# ╔═╡ dfe045a5-b5a4-4b98-aad8-668d2fd77c1e
+begin
+	OVERVIEW_SEED = 307
+	RUN_BENCHMARKS = false
+	overview_rng(seed::Integer=OVERVIEW_SEED) = MersenneTwister(seed)
+
+	function mean_ci(values; z=1.96)
+		n = length(values)
+		μ̂ = mean(values)
+		se = n > 1 ? std(values) / sqrt(n) : 0.0
+		return (mean=μ̂, se=se, lower=μ̂ - z * se, upper=μ̂ + z * se)
+	end
+end
 
 # ╔═╡ 1f9f0785-abc5-406e-a517-32c218904e4c
 md"""
@@ -177,11 +197,11 @@ where
 # ╔═╡ 3e361b9a-2ef9-46f1-8e64-127f0a53af42
 md"""
 ### Stability
-In queueing theory, stability is an important concept. A queueing system is stable if the arrival rate does not exceed the service rate over the long run. 
+In queueing theory, stability is an important concept. A queueing system is stable if the service capacity is large enough that the number of customers in the system does not grow without bound. For an M/M/1 queue this means:
 ```math
-a_n=d_n
+\rho = \frac{\lambda}{\mu} < 1.
 ```
-This equation indicates that for the system to be stable, the arrival rate must equal the departure rate for each state ``n``. This ensures that the number of customers in the system does not grow unbounded over time.
+For ``c`` identical parallel servers this becomes ``\rho = \lambda/(c\mu) < 1``. In steady state, the long-run average departure rate equals the long-run average arrival rate, but that balance is a consequence of stability rather than the stability condition itself.
 
 """
 
@@ -191,10 +211,10 @@ md"""
 
 The PASTA property is an important result in queueing theory which states that for a system with Poisson arrivals, the probability of an arrival seeing a particular state of the system is equal to the long-term time-average probability of the system being in that state:
 ```math
-P_n=a_n
+P\{L(A^-)=n\}=P_n
 ```
 
-This equation indicates that for a system with Poisson arrivals, the steady state probability ``P_n``  of having ``n`` customers in the system is equal to the arrival rate ``a_n`` when there are ``n`` customers in the system.
+This equation says that arrivals "see" the same state distribution as an observer who samples the system at a random time. The property depends on the arrival process being Poisson; it does not generally hold for scheduled or state-dependent arrivals.
 """
 
 # ╔═╡ 2e5e85ed-2234-48ee-a73d-33d73d06112a
@@ -221,7 +241,7 @@ While the M/M/1 model is a valuable tool, it has some limitations:
 * Single Server: It only applies to systems with a single server. More complex models are needed for systems with multiple servers.
 
 ### Descriptives
-It can be shown that the M/M/M1 queuing model has the following properties:
+It can be shown that the M/M/1 queueing model has the following properties when ``\lambda < \mu``:
 
 | Metric                | Value             |
 |------------------------------------------------------------------|----------------------------------------|
@@ -229,7 +249,7 @@ It can be shown that the M/M/M1 queuing model has the following properties:
 | ``P_0`` (steady state probability for zero customers)            | ``1 - \frac{\lambda}{\mu}``                       |
 | ``P_n`` (steady state probability for ``n`` customers)           | ``\left(1 - \frac{\lambda}{\mu}\right)\left(\frac{\lambda}{\mu}\right)^n \; (\forall n>0)`` |
 | ``\mathbb{E}[L]`` (Expected number of customers in the system)   | ``\frac{\lambda}{\mu - \lambda}`` |
-| ``\mathbb{E}[W]`` (Expected number of customers in the system)   | ``\frac{1}{\mu - \lambda}`` |
+| ``\mathbb{E}[W]`` (Expected time a customer spends in the system)   | ``\frac{1}{\mu - \lambda}`` |
 | ``\mathbb{E}[W_Q]`` (Expected time a customer spends waiting in the queue)   | ``\frac{\lambda}{\mu}\frac{1}{\mu - \lambda}`` |
 | ``\mathbb{E}[L_Q]`` (Expected number of customers in the queue)   | ``\frac{\lambda^2}{\mu}\frac{1}{\mu - \lambda}`` |
 
@@ -247,8 +267,8 @@ A MM1 queuing system will be used to illustrate the three main simulation method
 
 # ╔═╡ 98c7d5e9-0476-48f0-8dfc-21de440018b1
 begin
-	const λ = 1.0
-	const μ = 2.0
+	λ = 1.0
+	μ = 2.0
 end;
 
 # ╔═╡ 7431f6ed-f69a-43ca-9200-0c4304357d7f
@@ -256,31 +276,35 @@ md"""
 #### Time-stepping
 A small value for the time increment ``\Delta t`` is chosen and every tick of the clock a function that mimics our queuing system is run.
 
-Exponential distributions can be easily simulated; ``P(\text{arrival})=\lambda\Delta t`` and ``P(\text{departure})=\mu\Delta t``.
+For sufficiently small ``\Delta t``, we can approximate the event probabilities by ``P(\text{arrival})\approx\lambda\Delta t`` and ``P(\text{departure})\approx\mu\Delta t``. This is only an approximation: if ``\Delta t`` is too large, multiple arrivals or services can occur inside one tick, but the model below can record at most one of each.
 """
 
 # ╔═╡ d1afab78-ed9f-401b-81ed-3a4131d619d1
 Δt = 0.1
 
 # ╔═╡ 1df06a1b-373f-4c47-a0a0-aa076905bafc
-function time_step(nr_in_system::Int)
-    if nr_in_system > 0
-        if rand() < μ*Δt
-            nr_in_system -= 1
-        end
-    end
-    if rand() < λ*Δt
-        nr_in_system += 1
-    end
-    nr_in_system
+begin
+	function time_step(rng::AbstractRNG, nr_in_system::Int)
+	    if nr_in_system > 0
+	        if rand(rng) < μ*Δt
+	            nr_in_system -= 1
+	        end
+	    end
+	    if rand(rng) < λ*Δt
+	        nr_in_system += 1
+	    end
+	    nr_in_system
+	end
+	
+	time_step(nr_in_system::Int) = time_step(Random.default_rng(), nr_in_system)
 end
 
 # ╔═╡ aa80bf93-fefe-4b80-87fa-a9cdc22b9778
-let output = Int[], t = 0.0, tmax=10
+let output = Int[], t = 0.0, tmax=10, rng = overview_rng(1_001)
 	push!(output, 0)
 	while t < tmax
 		t += Δt
-		result = time_step(output[end])
+		result = time_step(rng, output[end])
 		push!(output, result)
 	end
 	plot(range(0, tmax+Δt, step=Δt), output, line=:steppost, label="", xlabel="t", ylabel="N", marker=:cross, markeralpha=0.5)
@@ -292,7 +316,7 @@ We can make the following observations:
 * This approach is very easy to implement for simple queuing systems, but becomes cumbersome if the system gets more complex (e.g. larger number of queues, additional interactions, other distributions, ...)
 * When are we in steady-state? 
 * How many samples of the system in steady-state are needed, to produce a useful average?
-* How many runs do a need to have some statistics about the variation around the average?
+* How many runs do we need to quantify the variation around the average?
 
 """
 
@@ -302,8 +326,8 @@ md"""
 Looking at the output of the time-stepping procedure, we can observe for a lot of the time-steps the state of our system (i.e. the number of clients in the system) does not change. So the procedure does a lot of processing for nothing.
 
 To be more efficient, we can predict
-- the next arrival of a client by sampling an exponential distribution with parameter ``\frac{1}{\lambda}``;
-- the service time of a client by sampling an exponential distribution with parameter ``\frac{1}{\mu}``.
+- the next arrival of a client by sampling an exponential distribution with mean ``\frac{1}{\lambda}`` (i.e. rate ``\lambda``);
+- the service time of a client by sampling an exponential distribution with mean ``\frac{1}{\mu}`` (i.e. rate ``\mu``).
 
 
 Only during an arrival of a client or an end of service of a client, the state of the systems changes.
@@ -311,39 +335,40 @@ Only during an arrival of a client or an end of service of a client, the state o
 
 # ╔═╡ dcee2831-3f71-4ea0-a124-401a4a93452e
 begin
-	const interarrival_distribution = Exponential(1/λ)
-	const service_distribution = Exponential(1/μ)
+	interarrival_distribution = Exponential(1/λ)
+	service_distribution = Exponential(1/μ)
 end;
 
 # ╔═╡ 07520778-2231-46d1-99a8-7db44b7491c4
-function service(ev::AbstractEvent, times::Vector{Float64}, output::Vector{Int})
+function service(ev::AbstractEvent, times::Vector{Float64}, output::Vector{Int}, rng::AbstractRNG)
     sim = environment(ev)
     time = now(sim)
     push!(times, time)
     push!(output, output[end]-1)
     if output[end] > 0
-        service_delay = rand(service_distribution)
-        @callback service(timeout(sim, service_delay), times, output)
+        service_delay = rand(rng, service_distribution)
+        @callback service(timeout(sim, service_delay), times, output, rng)
     end
 end
 
 # ╔═╡ b97beac5-fdf8-484a-89fc-f7421b6e9bd1
-function arrival(ev::AbstractEvent, times::Vector{Float64}, output::Vector{Int})
+function arrival(ev::AbstractEvent, times::Vector{Float64}, output::Vector{Int}, rng::AbstractRNG)
     sim = environment(ev)
     time = now(sim)
     push!(times, time)
     push!(output, output[end]+1)
     if output[end] == 1
-        service_delay = rand(service_distribution)
-        @callback service(timeout(sim, service_delay), times, output)
+        service_delay = rand(rng, service_distribution)
+        @callback service(timeout(sim, service_delay), times, output, rng)
     end
-    next_arrival_delay = rand(interarrival_distribution)
-    @callback arrival(timeout(sim, next_arrival_delay), times, output)
+    next_arrival_delay = rand(rng, interarrival_distribution)
+    @callback arrival(timeout(sim, next_arrival_delay), times, output, rng)
 end
 
 # ╔═╡ e4db485f-ef16-4d73-9787-7e89c9b056f7
-let times = Float64[0.0], output = Int[0], sim = Simulation(), next_arrival_delay = rand(interarrival_distribution)
-	@callback arrival(timeout(sim, next_arrival_delay), times, output)
+let times = Float64[0.0], output = Int[0], sim = Simulation(), rng = overview_rng(2_001)
+	next_arrival_delay = rand(rng, interarrival_distribution)
+	@callback arrival(timeout(sim, next_arrival_delay), times, output, rng)
 	run(sim, 10.0)
 	plot(times, output, line=:steppost, label="", xlabel="t", ylabel="N", marker=:circle, markeralpha=0.8, markerfill=:lightblue)
 end
@@ -352,13 +377,13 @@ end
 md"""
 We can make the following observations:
 - Two callback functions describe completely what happens during the execution of an event.
-- For complicated systems (network of queues, clients with priorities, other scheduling methods) working with discrete events in this ways results in spaghetti code.
+- For complicated systems (network of queues, clients with priorities, other scheduling methods) working directly with discrete events in this way can result in spaghetti code.
 - Code reuse is very limited. A lot of very different application domains can be modeled in a similar way.
 """
 
 # ╔═╡ d2cb1cbb-cd2b-463d-8a39-376874c0d3d8
 md"""#### Process-driven discrete-event simulation
-We now come to the final approach, where we used process-driven distrete-event simulation. The advantage of this approach is that events and their callbacks are abstracted and the simulation creator has only to program the logic of the system. A process function describes what a specific entity (also called agent) is doing.
+We now come to the final approach, where we use process-driven discrete-event simulation. The advantage of this approach is that events and their callbacks are abstracted and the simulation creator only has to program the logic of the system. A process function describes what a specific entity (also called agent) is doing.
 
 We can use `ConcurrentSim` to build a simulation of our M/M/1 system.
 
@@ -373,11 +398,11 @@ $(Markdown.parse(function_source_extractor(txt, "MM1_queue_simulation")))
 """
 
 # ╔═╡ fda9c83a-4c19-4cb2-9dfe-1760f287952d
-MM1_queue_simulation(interarrival_distribution, service_distribution, 10)
+MM1_queue_simulation(interarrival_distribution, service_distribution, 10; rng=overview_rng(3_001))
 
 # ╔═╡ 70143d09-77ec-4bd5-b621-ec638fbfb000
 let
-	t,n = MM1_queue_simulation(interarrival_distribution, service_distribution, 10)
+	t,n,_ = MM1_queue_simulation(interarrival_distribution, service_distribution, 10; rng=overview_rng(3_002))
 	plot(t, n, line=:steppost, label="", xlabel="t", ylabel="N", marker=:circle, markeralpha=0.8, markerfill=:lightblue)
 end
 
@@ -389,18 +414,18 @@ We now have an efficient method to obtain data from a single simulation. We can 
 
 # ╔═╡ 9b3ec442-df47-4dce-8dc0-373d8737252b
 begin
-	const RUNS = 30
-	const DURATION = 1000.0
+	RUNS = 30
+	DURATION = 1000.0
 end;
 
 # ╔═╡ 5b9c83fd-8031-450a-8217-d8c6d1f884a6
 md"""
-We can try to retrieve the analytical descriptives using simulation
+We can try to retrieve the analytical descriptors using simulation
 
 ##### Estimating ``P_n``
 
 
-**Note:** you should normalize the probabilities of states for the time spent in them.
+**Note:** each state's probability must be weighted by the total time the system spends in that state (a time average), not by how many times the state is visited.
 """
 
 # ╔═╡ bfd5a133-004d-4889-b541-f40e05b51e54
@@ -413,14 +438,14 @@ let
 	
 	for i in 1:RUNS
 		Pₙ = Dict{Int, Float64}()
-		times, clients, _ = MM1_queue_simulation(interarrival_distribution, service_distribution, DURATION)
+		times, clients, _ = MM1_queue_simulation(interarrival_distribution, service_distribution, DURATION; rng=overview_rng(4_000 + i))
 		for (i,t) in enumerate(times[1:length(times)-1])
 			duration = times[i+1] - t
 			Pₙ[clients[i]] = get(Pₙ, clients[i],0) + duration	
 		end
 		Pₙ_sim = [get(Pₙ,n, 0) for n in N] ./ sum(values(Pₙ))
 
-		# assing probability matrix
+		# assign probability matrix
 		for n in N
 			probmatrix[i, n+1] = Pₙ_sim[n+1]
 		end
@@ -446,7 +471,7 @@ end
 
 # ╔═╡ 8e02afc1-1471-4d03-9a37-2d82526e0e80
 md"""
-#### Estimating ``\mathbb{E}[W_Q]``
+##### Estimating ``\mathbb{E}[W_Q]``
 To get an estimate of the mean time spent waiting, we need to retrieve this information from our simulation.
 """
 
@@ -454,14 +479,361 @@ To get an estimate of the mean time spent waiting, we need to retrieve this info
 let
 	waitmeans = Float64[]
 	for i in 1:RUNS
-		_,_,wait = MM1_queue_simulation(interarrival_distribution, service_distribution, DURATION)
+		_,_,wait = MM1_queue_simulation(interarrival_distribution, service_distribution, DURATION; rng=overview_rng(5_000 + i))
 		push!(waitmeans, mean(wait))
 	end
 
 	boxplot(waitmeans, fill=0.5, label="")
 	scatter!([1], [λ / (μ * (μ - λ))], marker=:x, color=:black, label="Theoretical")
 	plot!(xticks=false, xlims=(0,2), xlabel="", ylabel=L"\mathbb{E}[W_Q]", ylims=(0.2, 1.0), title="Mean waiting time distribution", size=(400, 400))
-	#mean(wait), )
+end
+
+# ╔═╡ 0eaac249-2020-4264-a8d2-1a68eb1fe4dc
+md"""
+!!! info "Verification vs. validation"
+	The boxplots above overlay the simulated descriptors (``\hat{P}_n``, ``\mathbb{E}[W_Q]``, and later ``\mathbb{E}[L]``) on their analytical M/M/1 values. Reproducing those curves is a **verification** check: it is evidence that our code implements the *intended* model correctly — the arrival and service streams, the single-server FCFS logic and the trace bookkeeping all behave as the M/M/1 equations predict.
+
+	It is **not** a **validation** of the model. Validation asks whether M/M/1 is the *right* model for the real system under study. That requires confronting the simulation with real-world data and checking whether its assumptions — Poisson arrivals, exponential service times, FCFS discipline, a single server and an infinite waiting room — actually hold for that system. A simulation can agree perfectly with theory and still be the wrong model for the problem at hand.
+
+	In the language of the M&S pipeline: matching the analytical descriptors answers *"did we build the model right?"* (verification), not *"did we build the right model?"* (validation).
+"""
+
+# ╔═╡ 3ddd4941-a578-4c1d-b42a-ed1e47e85f39
+md"""
+## Performance insight: making the M/M/1 simulation cheaper
+
+The process-driven simulation above is already much better than stepping through every small time interval. Still, the way we collect and process data can dominate runtime when we repeat the simulation many times.
+
+We will keep the same model and improve only the implementation details:
+1. keep the original trace and analyse it afterwards;
+2. use a local random-number generator and size hints for trace storage;
+3. compute summary statistics online instead of storing every event;
+4. preallocate many independent runs and dispatch them across threads.
+"""
+
+# ╔═╡ a874701c-f450-4016-bc37-46c7b7554dd0
+struct MM1Summary
+	mean_wait::Float64
+	time_average_n::Float64
+	service_starts::Int
+	completed::Int
+	max_n::Int
+end
+
+# ╔═╡ 15e9aff1-695e-4178-885a-3306d0367ed2
+function summarize_trace(times::Vector{Float64}, output::Vector{Int}, wait_times::Vector{Float64}, max_time::Real)
+	t_end = Float64(max_time)
+	area_n = 0.0
+	for i in 1:(length(times)-1)
+		area_n += output[i] * (times[i+1] - times[i])
+	end
+	area_n += output[end] * max(t_end - times[end], 0.0)
+
+	mean_wait = isempty(wait_times) ? NaN : mean(wait_times)
+	completed = count(i -> output[i+1] < output[i], 1:(length(output)-1))
+	return MM1Summary(mean_wait, area_n / t_end, length(wait_times), completed, maximum(output))
+end
+
+# ╔═╡ be35839a-c05f-4f4e-ab6b-fbe1f28b68d1
+function MM1_trace_summary(interarrival_distribution::UnivariateDistribution, service_distribution::UnivariateDistribution, max_time::Real; seed::Int=7_000)
+	times, output, wait_times = MM1_queue_simulation(interarrival_distribution, service_distribution, max_time; rng=overview_rng(seed))
+	return summarize_trace(times, output, wait_times, max_time)
+end
+
+# ╔═╡ 19bdb483-7f93-4632-b94e-580886d2ced5
+md"""
+### Trace variant with local randomness and storage hints
+
+The original version uses the global random-number generator and lets arrays grow as needed. For one small run that is perfectly fine. For thousands of replications it is better to make random streams explicit and give trace arrays a reasonable initial capacity.
+"""
+
+# ╔═╡ 8cb648c4-07a5-4746-999a-cd6140cb83b6
+begin
+	@resumable function packet_generator_trace!(sim::Simulation,
+			rng::Random.AbstractRNG,
+			interarrival_distribution::UnivariateDistribution,
+			service_distribution::UnivariateDistribution,
+			times::Vector{Float64},
+			output::Vector{Int},
+			wait_times::Vector{Float64})
+		line = Resource(sim, 1)
+		while true
+			next_arrival_delay = rand(rng, interarrival_distribution)
+			@yield timeout(sim, next_arrival_delay)
+			@process packet_trace!(sim, rng, service_distribution, line, times, output, wait_times)
+		end
+	end
+
+	@resumable function packet_trace!(sim::Simulation,
+			rng::Random.AbstractRNG,
+			service_distribution::UnivariateDistribution,
+			line::Resource,
+			times::Vector{Float64},
+			output::Vector{Int},
+			wait_times::Vector{Float64})
+		time_in = now(sim)
+		push!(times, time_in)
+		push!(output, output[end] + 1)
+		@yield request(line)
+		push!(wait_times, now(sim) - time_in)
+		@yield timeout(sim, rand(rng, service_distribution))
+		push!(times, now(sim))
+		push!(output, output[end] - 1)
+		@yield release(line)
+	end
+
+	function MM1_queue_simulation_trace(interarrival_distribution::UnivariateDistribution,
+			service_distribution::UnivariateDistribution,
+			max_time::Real; seed::Int=7_000, max_events_hint::Int=10_000)
+		sim = Simulation()
+		rng = overview_rng(seed)
+		times = Float64[now(sim)]
+		output = Int[0]
+		wait_times = Float64[]
+		sizehint!(times, max_events_hint)
+		sizehint!(output, max_events_hint)
+		sizehint!(wait_times, max_events_hint ÷ 2)
+		@process packet_generator_trace!(sim, rng, interarrival_distribution, service_distribution, times, output, wait_times)
+		run(sim, max_time)
+		return times, output, wait_times
+	end
+end
+
+# ╔═╡ 6b95be91-2b47-49cb-82ff-2a548ba0b023
+let
+	times, output, wait_times = MM1_queue_simulation_trace(interarrival_distribution, service_distribution, 100.0; seed=7_000)
+	summarize_trace(times, output, wait_times, 100.0)
+end
+
+# ╔═╡ ef46aded-d2ba-4a07-85e3-f2892f8048a7
+md"""
+### Online statistics
+
+If we only need aggregate indicators, storing the complete event trace is wasteful. We can update the time-average number of customers and the waiting-time sum while the simulation runs.
+"""
+
+# ╔═╡ 955a6862-34f0-45d4-999b-cf51b73290ec
+begin
+	mutable struct MM1Accumulator
+		last_time::Float64
+		n::Int
+		area_n::Float64
+		wait_sum::Float64
+		service_starts::Int
+		completed::Int
+		max_n::Int
+	end
+
+	function observe_n!(acc::MM1Accumulator, time::Float64, new_n::Int)
+		acc.area_n += acc.n * (time - acc.last_time)
+		acc.last_time = time
+		acc.n = new_n
+		acc.max_n = max(acc.max_n, new_n)
+		return acc
+	end
+
+	function finish_summary(acc::MM1Accumulator, max_time::Real)
+		t_end = Float64(max_time)
+		area_n = acc.area_n + acc.n * max(t_end - acc.last_time, 0.0)
+		mean_wait = acc.service_starts == 0 ? NaN : acc.wait_sum / acc.service_starts
+		return MM1Summary(mean_wait, area_n / t_end, acc.service_starts, acc.completed, acc.max_n)
+	end
+
+	@resumable function packet_generator_online!(sim::Simulation,
+			rng::Random.AbstractRNG,
+			interarrival_distribution::UnivariateDistribution,
+			service_distribution::UnivariateDistribution,
+			acc)
+		line = Resource(sim, 1)
+		while true
+			next_arrival_delay = rand(rng, interarrival_distribution)
+			@yield timeout(sim, next_arrival_delay)
+			@process packet_online!(sim, rng, service_distribution, line, acc)
+		end
+	end
+
+	@resumable function packet_online!(sim::Simulation,
+			rng::Random.AbstractRNG,
+			service_distribution::UnivariateDistribution,
+			line::Resource,
+			acc)
+		time_in = now(sim)
+		observe_n!(acc, time_in, acc.n + 1)
+		@yield request(line)
+		acc.wait_sum += now(sim) - time_in
+		acc.service_starts += 1
+		@yield timeout(sim, rand(rng, service_distribution))
+		observe_n!(acc, now(sim), acc.n - 1)
+		acc.completed += 1
+		@yield release(line)
+	end
+
+	function MM1_queue_summary(interarrival_distribution::UnivariateDistribution,
+			service_distribution::UnivariateDistribution,
+			max_time::Real; seed::Int=7_000)
+		sim = Simulation()
+		rng = overview_rng(seed)
+		acc = MM1Accumulator(now(sim), 0, 0.0, 0.0, 0, 0, 0)
+		@process packet_generator_online!(sim, rng, interarrival_distribution, service_distribution, acc)
+		run(sim, max_time)
+		return finish_summary(acc, max_time)
+	end
+end
+
+# ╔═╡ 9f7e106a-f7a1-4837-b354-b58dfe6711fa
+begin
+	function MM1_many_runs_serial(nruns::Int, max_time::Real; seed::Int=7_000)
+		summaries = Vector{MM1Summary}(undef, nruns)
+		for i in eachindex(summaries)
+			summaries[i] = MM1_queue_summary(interarrival_distribution, service_distribution, max_time; seed=seed+i)
+		end
+		return summaries
+	end
+
+	function MM1_many_runs_threaded(nruns::Int, max_time::Real; seed::Int=7_000)
+		summaries = Vector{MM1Summary}(undef, nruns)
+		Threads.@threads for i in eachindex(summaries)
+			summaries[i] = MM1_queue_summary(interarrival_distribution, service_distribution, max_time; seed=seed+i)
+		end
+		return summaries
+	end
+
+	function summarize_runs(summaries::Vector{MM1Summary})
+		return (
+			mean_wait = mean(s.mean_wait for s in summaries),
+			mean_time_average_n = mean(s.time_average_n for s in summaries),
+			total_service_starts = sum(s.service_starts for s in summaries),
+			total_completed = sum(s.completed for s in summaries),
+			max_n = maximum(s.max_n for s in summaries),
+		)
+	end
+end
+
+# ╔═╡ c056fe7c-c760-4c07-83c1-56c3f7cc4c9d
+let
+	summaries = MM1_many_runs_threaded(12, 250.0; seed=7_000)
+	summarize_runs(summaries)
+end
+
+# ╔═╡ fb0ff874-2683-4517-bf43-166b0187f848
+md"""
+### Warm-up deletion and batch means
+
+Queueing simulations often start empty, while the formulas above describe steady-state behaviour. One simple output-analysis workflow is:
+1. discard an initial warm-up period;
+2. split the remaining trace into equal time batches;
+3. treat the batch means as approximately independent observations.
+
+This is not a magic guarantee of independence, but it is a useful practical diagnostic and a good first estimate of simulation uncertainty.
+"""
+
+# ╔═╡ 0ea46f55-5dcc-475c-9aba-8458e4f61a8a
+begin
+	function time_average_n_between(times::Vector{Float64}, output::Vector{Int}, start_time::Real, end_time::Real)
+		t0 = Float64(start_time)
+		t1 = Float64(end_time)
+		t1 > t0 || throw(ArgumentError("end_time must be larger than start_time"))
+		area = 0.0
+		for i in eachindex(output)
+			next_time = i < length(times) ? times[i + 1] : t1
+			segment_start = max(times[i], t0)
+			segment_end = min(next_time, t1)
+			segment_end > segment_start && (area += output[i] * (segment_end - segment_start))
+		end
+		return area / (t1 - t0)
+	end
+
+	function batch_means_n(times::Vector{Float64}, output::Vector{Int}; warmup::Real, batch_length::Real, nbatches::Int)
+		[
+			time_average_n_between(
+				times,
+				output,
+				warmup + (batch - 1) * batch_length,
+				warmup + batch * batch_length,
+			)
+			for batch in 1:nbatches
+		]
+	end
+end
+
+# ╔═╡ a097fa63-d64f-46e9-99f6-2ddd7dfc7d98
+let
+	warmup = 200.0
+	batch_length = 100.0
+	nbatches = 8
+	horizon = warmup + batch_length * nbatches
+	times, output, _ = MM1_queue_simulation_trace(
+		interarrival_distribution,
+		service_distribution,
+		horizon;
+		seed=6_001,
+		max_events_hint=round(Int, 2λ * horizon),
+	)
+	batches = batch_means_n(times, output; warmup, batch_length, nbatches)
+	ci = mean_ci(batches)
+	DataFrame(
+		metric=["warm-up", "batch length", "batches", "mean batch L", "lower 95% CI", "upper 95% CI", "theoretical E[L]"],
+		value=[warmup, batch_length, nbatches, ci.mean, ci.lower, ci.upper, λ / (μ - λ)],
+	)
+end
+
+# ╔═╡ f32a8c75-6f1c-4872-9d1f-59c71ea9f0ef
+md"""
+### Small benchmark comparison
+
+The exact speedups depend on your computer and on the number of Julia threads. The pattern to look for is more important than the absolute timing: avoid storing data you do not need, preallocate when the size is known, and parallelize independent replications.
+
+Benchmarks are skipped by default to keep the notebook responsive. Set `RUN_BENCHMARKS = true` near the top of the notebook to run this comparison.
+"""
+
+# ╔═╡ da95e3bf-3ba0-496b-bb0e-34cf3eab9a3f
+function benchmark_mm1_variants(; max_time::Float64=120.0, nruns::Int=4)
+	variants = [
+		("trace + posthoc", () -> MM1_trace_summary(interarrival_distribution, service_distribution, max_time; seed=7_000)),
+		("local rng trace", () -> begin
+			times, output, wait_times = MM1_queue_simulation_trace(interarrival_distribution, service_distribution, max_time; seed=7_000)
+			summarize_trace(times, output, wait_times, max_time)
+		end),
+		("online summary", () -> MM1_queue_summary(interarrival_distribution, service_distribution, max_time; seed=7_000)),
+		("serial replications", () -> MM1_many_runs_serial(nruns, max_time; seed=7_000)),
+		("threaded replications", () -> MM1_many_runs_threaded(nruns, max_time; seed=7_000)),
+	]
+
+	names = String[]
+	times_ms = Float64[]
+	allocations = Int[]
+	memory_kib = Float64[]
+	for (name, f) in variants
+		trial = @benchmark $f() samples=3 evals=1 seconds=0.25
+		estimate = median(trial)
+		push!(names, name)
+		push!(times_ms, estimate.time / 1e6)
+		push!(allocations, estimate.allocs)
+		push!(memory_kib, estimate.memory / 1024)
+	end
+
+	baseline_time = first(times_ms)
+	return DataFrame(
+		variant = names,
+		median_ms = round.(times_ms; digits=2),
+		allocations = allocations,
+		memory_kib = round.(memory_kib; digits=1),
+		speedup_vs_baseline = round.(baseline_time ./ times_ms; digits=2),
+	)
+end
+
+# ╔═╡ e2958e8e-a1b1-4f77-bb42-f3e62e9a77cc
+if RUN_BENCHMARKS
+	benchmark_mm1_variants()
+else
+	DataFrame(
+		variant=["benchmarks skipped"],
+		median_ms=[missing],
+		allocations=[missing],
+		memory_kib=[missing],
+		speedup_vs_baseline=[missing],
+		note=["Set RUN_BENCHMARKS = true to run this cell."],
+	)
 end
 
 # ╔═╡ 1270f652-40b7-4088-b1a2-164decdf7f18
@@ -475,7 +847,7 @@ Runtime refers to the amount of time a simulation takes to execute. It encompass
 Long runtimes can be impractical, especially for complex models or those requiring numerous iterations to achieve statistical significance. Knowing the runtime helps in planning and allocating computational resources effectively.
 It can also be used for comparing the efficiency of different simulation algorithms or models.
 
-**Note**: You can often run simulations in parallel, by dispatching the simulations to seperate threads, this can substantially improve the total computation time.
+**Note**: You can often run simulations in parallel by dispatching independent replications to separate threads. This can substantially improve the total computation time.
 
 ### Number of Runs
 The number of runs refers to the number of times a simulation is executed. Each run typically starts with different initial conditions or random seeds to ensure statistical validity and robustness of the results.
@@ -508,6 +880,7 @@ The regenerative approach helps address the issue of autocorrelation in simulati
 # ╟─af43ec68-24a5-11ef-395c-f52d0ef97f09
 # ╟─3ffef524-2386-4010-878c-c11c7e0515a8
 # ╠═bad420d3-8971-4b03-816d-8be354f5009d
+# ╠═dfe045a5-b5a4-4b98-aad8-668d2fd77c1e
 # ╟─1f9f0785-abc5-406e-a517-32c218904e4c
 # ╟─ee7affdb-177e-4da9-abe5-fd7f23820ece
 # ╟─256512c8-6b13-48fb-a5eb-9aefb241ce3a
@@ -536,5 +909,23 @@ The regenerative approach helps address the issue of autocorrelation in simulati
 # ╟─5b9c83fd-8031-450a-8217-d8c6d1f884a6
 # ╟─bfd5a133-004d-4889-b541-f40e05b51e54
 # ╟─8e02afc1-1471-4d03-9a37-2d82526e0e80
-# ╟─af159f28-a476-402f-9f96-123b2cbf5f8f
+# ╠═af159f28-a476-402f-9f96-123b2cbf5f8f
+# ╟─0eaac249-2020-4264-a8d2-1a68eb1fe4dc
+# ╟─3ddd4941-a578-4c1d-b42a-ed1e47e85f39
+# ╠═a874701c-f450-4016-bc37-46c7b7554dd0
+# ╠═15e9aff1-695e-4178-885a-3306d0367ed2
+# ╠═be35839a-c05f-4f4e-ab6b-fbe1f28b68d1
+# ╟─19bdb483-7f93-4632-b94e-580886d2ced5
+# ╠═8cb648c4-07a5-4746-999a-cd6140cb83b6
+# ╠═6b95be91-2b47-49cb-82ff-2a548ba0b023
+# ╟─ef46aded-d2ba-4a07-85e3-f2892f8048a7
+# ╠═955a6862-34f0-45d4-999b-cf51b73290ec
+# ╠═9f7e106a-f7a1-4837-b354-b58dfe6711fa
+# ╠═c056fe7c-c760-4c07-83c1-56c3f7cc4c9d
+# ╟─fb0ff874-2683-4517-bf43-166b0187f848
+# ╠═0ea46f55-5dcc-475c-9aba-8458e4f61a8a
+# ╠═a097fa63-d64f-46e9-99f6-2ddd7dfc7d98
+# ╟─f32a8c75-6f1c-4872-9d1f-59c71ea9f0ef
+# ╠═da95e3bf-3ba0-496b-bb0e-34cf3eab9a3f
+# ╠═e2958e8e-a1b1-4f77-bb42-f3e62e9a77cc
 # ╟─1270f652-40b7-4088-b1a2-164decdf7f18

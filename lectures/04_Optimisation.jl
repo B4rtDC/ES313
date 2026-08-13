@@ -25,6 +25,8 @@ begin
 	using Ipopt
 	using BenchmarkTools
 	using Distributions
+	using Random
+	using Statistics
 end
 
 # ╔═╡ ddac3c21-7ac9-4295-aeca-a8f460c1f3b1
@@ -42,15 +44,15 @@ html"""
 
 # ╔═╡ 7f3b10fe-8a8e-49ba-a468-a7fa0cb8c17d
 md"""# Optimisation
-In this chapter we wil have a look at some optimisation methods, and their applications. Depending on your future needs, you might even need more advanced or niche solvers. In that case, the following references can be of help:
+In this chapter we will have a look at some optimisation methods, and their applications. Depending on your future needs, you might even need more advanced or niche solvers. In that case, the following references can be of help:
 * [Algorithms for Optimization, by Mykel J. Kochenderfer and Tim A. Wheeler](https://algorithmsbook.com/optimization/)
-* [Optimization.jl](https://docs.sciml.ai/Optimization/stable/) package, which not only provides a unified interface to many optimisation package, but can also serve as a starting point to find the tool suited for the job.
+* [Optimization.jl](https://docs.sciml.ai/Optimization/stable/) package, which not only provides a unified interface to many optimisation packages, but can also serve as a starting point to find the tool suited for the job.
 * [NLOpt](https://nlopt.readthedocs.io/en/latest/), an open-source library for nonlinear optimization.
 
 
 ## Introduction
 !!! info "Optimisation"
-	The process of making a system, design, or decision as effective or functional as possible. It involves finding the best solution from a set of feasible solutions. It typically be described in a more formal way by the following components:
+	The process of making a system, design, or decision as effective or functional as possible. It involves finding the best solution from a set of feasible solutions. It can typically be described in a more formal way by the following components:
 	- Objective function: the function that needs to be maximised or minimised.
 	- Decision variables: the variables that influence the outcome of the objective function.
 	- Constraints: restrictions or limitations on the decision variables (if applicable).
@@ -61,8 +63,8 @@ In this chapter we wil have a look at some optimisation methods, and their appli
 	```
 	where 
 	```math
-	\begin{array}
-	\vec{x} \in \mathbb{R}^n,\\ 
+	\begin{array}{l}
+	\vec{x} \in \mathbb{R}^n,\\
 	\Omega \subseteq \mathbb{R}^n,\\  
 	f : \mathbb{R}^n \mapsto \mathbb{R},\\ 
 	\vec{h} :  \mathbb{R}^n \mapsto \mathbb{R}^m \; (m\leq n),\\
@@ -94,6 +96,42 @@ Optimisation is a critical tool used across various fields to improve efficiency
 
 """
 
+# ╔═╡ 58a07465-ad20-4994-8622-13dd3d24a054
+md"""## From Problem to Solver
+
+The hard part of optimisation is often not the command that calls the solver. It is the modelling chain before that call:
+
+1. identify the decision variables;
+2. write the objective in terms of those variables;
+3. add all explicit and implicit constraints;
+4. classify the mathematical problem;
+5. choose a solver family;
+6. inspect whether the returned solution is trustworthy.
+
+| Question | Why it matters |
+|:---|:---|
+| Are the variables continuous, integer, or binary? | Determines whether a continuous solver is enough, or whether a mixed-integer solver is needed. |
+| Is the objective linear, quadratic, smooth nonlinear, or black-box? | Determines whether gradients, Hessians, or only function values can be used. |
+| Are the constraints linear, nonlinear, stochastic, or absent? | Determines which modelling language and solver family can represent the problem. |
+| Is the problem convex? | Determines whether a local optimum is also guaranteed to be global. |
+| Is there randomness in the objective or constraints? | Determines whether we need sampling, replication, or robust/chance-constrained formulations. |
+
+The rest of this lecture gives examples of these categories. Keep returning to this classification when choosing a method.
+"""
+
+# ╔═╡ 0fb23b4c-b85f-4202-873c-ff477865e1af
+md"""### Practical Solver Map
+
+| Problem type | Typical method | Julia interface used here | Main caveat |
+|:---|:---|:---|:---|
+| smooth unconstrained | BFGS, L-BFGS, Newton | `Optim.jl` | local optimum if non-convex |
+| derivative-free, low-dimensional | Nelder-Mead | `Optim.jl` | scales poorly with dimension |
+| linear continuous | simplex, interior point | `JuMP` + GLPK/Tulip | check feasibility and boundedness |
+| mixed-integer linear | branch-and-bound/cuts | `JuMP` + GLPK | can become expensive quickly |
+| smooth nonlinear constrained | interior point, SQP | `JuMP` + Ipopt | generally local for non-convex models |
+| noisy or black-box | stochastic search, sample average approximation | `Optim.jl`, custom simulation | solution depends on samples and budget |
+"""
+
 # ╔═╡ 19bc12c5-2d3c-46dc-bb9b-02efe0882295
 md"""
 ## Unconstrained optimisation
@@ -110,15 +148,15 @@ md"""
 	\nabla f\left(\vec x^\star\right) = \vec 0\,.
 	```
 	
-	This point may be a local minimum, maximum or a saddle point. If ``f`` is twice differentiable, and the Hessian, $\mathcal{H}f(\vec{x}^*$), is positive definite, then $\vec{x}^*$ is a local minimum (second order sufficient condition). Additionally, if ``f`` is convex, any local minimum is also a global minimum (cf. analysis courses). For strictly convex functions, the global minimum is unique.
+	This point may be a local minimum, maximum or a saddle point. If ``f`` is twice differentiable, and the Hessian, $\mathcal{H}f(\vec{x}^*)$, is positive definite, then $\vec{x}^*$ is a local minimum (second order sufficient condition). Additionally, if ``f`` is convex, any local minimum is also a global minimum (cf. analysis courses). For strictly convex functions, the global minimum is unique.
 
 
 
 
 !!! danger "Heads up!"
-	1. In order to be able to apply this, we need to have a function that in continuous, which may not always be the case!
+	1. In order to be able to apply this, we need to have a function that is continuous, which may not always be the case!
 
-	    To apply gradient-based methods, the function ``f`` must be differentiable at ``\vec{x}^*``. For the Hessian test, it must be twice differentiable. If ``f`` is not differentiable, alternative methods are needed. Additionally, linear functions may not have critical points unless, and thus may not have a finite minimum in unconstrained optimization.
+	    To apply gradient-based methods, the function ``f`` must be differentiable at ``\vec{x}^*``. For the Hessian test, it must be twice differentiable. If ``f`` is not differentiable, alternative methods are needed. Additionally, a non-constant linear function has no critical point (its gradient is a nonzero constant vector), and therefore has no finite minimum in unconstrained optimization.
 
 	2. These methods require an initial point. When multiple local minima exist, the initial point will have an impact on the result.
 
@@ -315,7 +353,7 @@ md"""
 	The formula makes successive ``p``-vectors conjugate (orthogonal in the Hessian metric), so for a true quadratic CG reaches the minimizer in ``\le n`` steps for quadratic functions.
 
 
-!!! warning "Info on line seach"
+!!! warning "Info on line search"
 	Linesearch routines attempt to locate quickly an approximate minimizer of the univariate function
 
 	```math
@@ -471,6 +509,18 @@ begin
 	end
 end
 
+# ╔═╡ 9089f56d-805b-4654-861d-65359972a72e
+md"""
+!!! tip "What the benchmark tells us"
+	Read the timings and allocations as a decision guide, not as a ranking of a single "best" algorithm. Four practical lessons come out of the benchmark output above:
+
+	1. **Supplying derivatives pays off.** Passing the analytic gradient `g!` (and, for Newton, the Hessian `h!`) is markedly faster and allocates far less than letting `Optim` approximate them with finite differences. On a cheap objective like this the gap is already visible; on an expensive simulation objective it becomes decisive.
+	2. **Newton is fastest near the minimum — if you can afford the Hessian.** With analytic `g!` and `h!` it reaches the solution in the fewest iterations thanks to its quadratic convergence, but it needs the ``n \times n`` Hessian at every step, which is costly or infeasible for large ``n``.
+	3. **Nelder-Mead is robust but slow.** Being derivative-free it needs no gradient at all, which makes it a safe fallback for black-box or non-smooth objectives, but here it converges the slowest.
+	4. **L-BFGS / BFGS are the sensible default.** When only a gradient is available they deliver near-Newton progress without ever forming the Hessian, and they scale to large problems (L-BFGS especially).
+
+	The takeaway matches the philosophy of this lecture: **pick and interpret the solver for your problem — how much derivative information you have, and how large ``n`` is — rather than memorising the internals of each method.**
+"""
 
 # ╔═╡ d4b05c5e-ac08-4a69-b54c-5d825d864bfa
 md"""
@@ -494,7 +544,7 @@ md"""
 	```
 	where $\vec c\in\mathbb R^n$, $\vec b\in\mathbb R^m$ and $\mathbf A \in \mathbb R^{m\times n}$. 
 
-The name "linear programming" stems from the contraints and the objective function being represented by linear relationships, so it can be considered as a special case of the more general family of optimisation problems. 
+The name "linear programming" stems from the constraints and the objective function being represented by linear relationships, so it can be considered as a special case of the more general family of optimisation problems. 
 The vector inequality $\vec x\ge\vec 0$ means that each component of $\vec x$ is nonnegative. Several variations of this problem are possible; e.g. instead of minimizing, we can maximize, or the constraints may be in the form of inequalities, such as $\mathbf A\vec x\ge \vec b$ or $\mathbf A\vec x\le\vec b$. These variations can all be rewritten into the standard form by introducing slack variables.
 
 !!! tip "Example"
@@ -502,7 +552,7 @@ The vector inequality $\vec x\ge\vec 0$ means that each component of $\vec x$ is
 	\min_{\vec{x}} x_1 +5 x_2 \; \text{ subject to } 
 	\cases{
 	5x_1 + 6x_2 \leq 30\\
-	2x_1 + 2x_2 \leq 12\\
+	3x_1 + 2x_2 \leq 12\\
 	x_1 \ge 0\\
 	x_2 \ge 0}
 	```
@@ -769,8 +819,42 @@ end
 # ╔═╡ a768a6d1-b9af-4c42-877b-9eb55cdee7d8
 md"""
 #### Implementations
-In Julia, the [`JuMP package`](https://jump.dev/JuMP.jl/stable/) is a domain-specific modeling language for mathematical optimization. It supports different open-source and commercial solvers for a variety of problem classes, including linear, mixed-integer, second-order conic, semidefinite, and nonlinear programming. This allows you to use the same overal interface to solve different kinds of problems or even to try different solvers on the same problem without having to change the problem's syntax.
+In Julia, the [`JuMP package`](https://jump.dev/JuMP.jl/stable/) is a domain-specific modeling language for mathematical optimization. It supports different open-source and commercial solvers for a variety of problem classes, including linear, mixed-integer, second-order conic, semidefinite, and nonlinear programming. This allows you to use the same overall interface to solve different kinds of problems or even to try different solvers on the same problem without having to change the problem's syntax.
 """
+
+# ╔═╡ 74acf321-9b1d-4ff9-9041-6b5a5f8c6ecd
+md"""#### Reading Solver Output
+
+After `optimize!(model)`, always inspect the solver result before using the numbers:
+
+- `termination_status(model)` tells you why the solver stopped;
+- `primal_status(model)` tells you whether a primal solution is available;
+- `dual_status(model)` tells you whether dual information is available;
+- objective values and variable values are meaningful only when the relevant status is valid.
+
+For engineering models, it is also good practice to check residuals: are the constraints satisfied, are resource limits respected, and are the units still meaningful?
+"""
+
+# ╔═╡ 4ffe059d-63b9-45e3-95e2-8965b34e359a
+"""
+	jump_report(model)
+
+Return a compact status report for a solved JuMP model.
+"""
+function jump_report(model::Model)
+	objective = try
+		objective_value(model)
+	catch
+		missing
+	end
+	
+	return (
+		termination = termination_status(model),
+		primal = primal_status(model),
+		dual = dual_status(model),
+		objective = objective,
+	)
+end
 
 # ╔═╡ 65ad9943-df85-43b2-aa28-f6e91da11e83
 md"""
@@ -836,7 +920,7 @@ begin
 	# determine the solution
 	optimize!(model)
 	# why did the solver stop?
-	@info termination_status(model)
+	@info jump_report(model)
 	# what is the objective function's value?
 	@info "Objective function value: $(objective_value(model))"
 	# show the solution
@@ -871,7 +955,7 @@ let
 	# determine the solution
 	optimize!(model)
 	# why did the solver stop?
-	@info termination_status(model)
+	@info jump_report(model)
 	# what is the objective function's value?
 	@info "Objective function value: $(objective_value(model))"
 	# show the solution
@@ -923,7 +1007,7 @@ Now suppose that one unit of product $X_1$ sells for €6 and $X_2$, $X_3$ and $
 f\left(x_1,x_2,x_3,x_4\right)=6x_1+4x_2+7x_3+5x_4
 ```
 
-The problem is then to maximize $f$ subject to the given constraints.
+The problem is then to maximize $f$ subject to the given constraints. Because production is counted in whole units, we additionally require the ``x_i`` to be integers, so this is strictly an *integer* linear program (imposing `Int` in the code makes JuMP switch to a branch-and-bound solver).
 """
 
 # ╔═╡ 12bfc573-4b38-499f-89c0-49e6ea70759f
@@ -1041,7 +1125,7 @@ md"""This problem is an _integer linear programming_ problem, i.e. the solution 
 
 We can use the simplex method to find a solution to an ILP problem if the $m\times n$ matrix $A$ is unimodular, i.e. if all its nonzero $m$th order minors are $\pm 1$.
 
-Should this not be the case, you can always impose a constraint on `x` to be integer. In doing so, you will (unkowingly) select a different solver for the problem.
+Should this not be the case, you can always impose a constraint on `x` to be integer. In doing so, you will (unknowingly) select a different solver for the problem.
 """
 
 # ╔═╡ 242719f3-2191-4e7f-878b-5fc7fe6f5080
@@ -1114,8 +1198,8 @@ The main challenge often is getting a full understanding of the situation, inclu
 
 # ╔═╡ ce5cea4c-17a0-4c12-b2f0-3b2ba705954e
 md"""
-### Quadratic progamming
-!!! info "Quadratic progam"
+### Quadratic programming
+!!! info "Quadratic program"
 	An optimization problem with a quadratic objective function and linear
 	constraints is called a _quadratic program_. Problems of this
 	type are important in their own right, and they also arise a subproblems
@@ -1156,7 +1240,7 @@ We consider the following equality-constrained quadratic problem:
 where $A$ is the $m\times n$ Jacobian of constraints and $\vec{b}\in\mathbb R^{m}$.
 We assume that $A$ has rank $m$ so that the constraints are consistent.
 
-The First Order Necessary Condition (FONC) uses the Langrangian function
+The First Order Necessary Condition (FONC) uses the Lagrangian function
 ```math
 \mathcal L\left(\vec x, \vec \lambda\right)=\vec{x}^\mathsf{T}Q\vec{x}- \vec{c}^\mathsf{T}\vec{x} + \vec\lambda^\mathsf{T} \left(A\vec{x}-\vec{b}\right)
 ```
@@ -1609,7 +1693,7 @@ that ``\vec{x}^{\circ}`` is a KKT point for the original problem. In
 fact, since ``Q`` is positive semidefinite, we have that ``\vec{x}^{\circ}``
 is a global minimum.
 
-If, on the other hand, on or more of the multipliers ``\mu_{j}^{\circ}``,
+If, on the other hand, one or more of the multipliers ``\mu_{j}^{\circ}``,
 ``j\in W^{\circ}``, are negative, the first KKT condition is not satisfied
 and the objective function ``f`` may be decreased by dropping one of
 these constraints. Thus, we remove an index ``j`` corresponding to
@@ -1617,7 +1701,7 @@ one of the negative multipliers from the working set and solve a new
 subproblem for the next step. While any index ``j`` for which ``\mu_{j}^{\circ}<0``
 usually will yield in a direction ``\vec{d}`` along which the algorithm
 can make progress, the most negative multiplier is often chosen in
-practice. This choice is motived by a sensitivity analysis, which
+practice. This choice is motivated by a sensitivity analysis, which
 shows that the rate of decrease in the objective function when one
 constraint is removed, is proportional to the magnitude of the Lagrange
 multiplier for that constraint.
@@ -1642,7 +1726,7 @@ where $f:\mathbb{R}^{n}\rightarrow\mathbb{R}$, $\vec{h}:\mathbb{R}^{n}\rightarro
 $m\leq n$, and $\vec{g}:\mathbb{R}^{n}\rightarrow\mathbb{R}^{p}$.
 
 !!! info "Sequential quadratic programming (SQP)"
-	The idea behind the this approach is to model the general problem at the current iterate ``\vec{x}^{\left(k\right)}`` by a quadratic programming subproblem, then use the minimizer of this subproblem to define a new iterate ``\vec{x}^{\left(k+1\right)}``. 
+	The idea behind this approach is to model the general problem at the current iterate ``\vec{x}^{\left(k\right)}`` by a quadratic programming subproblem, then use the minimizer of this subproblem to define a new iterate ``\vec{x}^{\left(k+1\right)}``. 
 
 The challenge is to design the quadratic subproblem so that it yields a good step for the general optimization problem.
 
@@ -1736,133 +1820,14 @@ Since we assume that ``Q`` is positive semidefinite, these KKT conditions
 are not only necessary but also sufficient, so we can solve the convex
 quadratic program by finding solutions of this system.
 
-Primal-dual methods generate iterates that satisfy the bounds strictly; that is, ``\vec{y}>0``
-and ``\vec{\mu}>0``. This property is the origin of the term interior-point.
-By respecting these bounds, the methods avoid spurious solutions,
-points that satisfy the system but not the bounds. Spurious solutions
-abound, and do not provide useful information about real solutions,
-so it makes sense to exclude them altogether. Given a current iterate
-``\left(\vec{x}^{\left(k\right)},\vec{y}^{\left(k\right)},\vec{\lambda}^{\left(k\right)},\vec{\mu}^{\left(k\right)}\right)``
-that satisfies ``\left(\vec{\mu}^{\left(k\right)},\vec{y}^{\left(k\right)}\right)>0``,
-we can define a _complementary measure_
-```math
-\nu_{k}=\frac{ \left(\vec{y}^{\left(k\right)}\right)^\mathsf{T}\vec{\mu}^{\left(k\right)}}{p}\,.
-```
-This measure gives an indication of the desirability of the couple
-``\left(\vec{\mu}^{\left(k\right)},\vec{y}^{\left(k\right)}\right)``.
-
-We derive a path-following, primal-dual method by considering the
-perturbed KKT conditions by
-```math
-\vec{F}\left(\vec{x}^{\left(k+1\right)},\vec{y}^{\left(k+1\right)},\vec{\lambda}^{\left(k+1\right)},\vec{\mu}^{\left(k+1\right)},\sigma_{k}\nu_{k}\right)=\begin{pmatrix}Q\vec{x}^{\left(k+1\right)}+ A_{\textrm{eq}}^\mathsf{T}\vec{\lambda}^{\left(k+1\right)}+ A_{\textrm{in}}^\mathsf{T}\vec{\mu}^{\left(k+1\right)}-\vec{c}\\
-Y_{k+1}M_{k+1}\vec{1}-\sigma_{k}\nu_{k}\vec{1}\\
-A_{\textrm{eq}}\vec{x}^{\left(k+1\right)}-\vec{b}_{\textrm{eq}}\\
-A_{\textrm{in}}\vec{x}^{\left(k+1\right)}-\vec{b}_{\textrm{in}}+\vec{y}^{\left(k+1\right)}
-\end{pmatrix}=\vec{0}\,,
-```
-where
-```math
-Y_{k+1}=\begin{pmatrix}y_{1}^{\left(k+1\right)} & 0 & \cdots & 0\\
-0 & y_{2}^{\left(k+1\right)} & \ddots & 0\\
-\vdots & \ddots & \ddots & 0\\
-0 & 0 & 0 & y_{p}^{\left(k+1\right)}
-\end{pmatrix}\,,\quad M_{k+1}=\begin{pmatrix}\mu_{1}^{\left(k+1\right)} & 0 & \cdots & 0\\
-0 & \mu_{2}^{\left(k+1\right)} & \ddots & 0\\
-\vdots & \ddots & \ddots & 0\\
-0 & 0 & 0 & \mu_{p}^{\left(k+1\right)}
-\end{pmatrix}\,,
-```
-and ``\sigma\in\left[0,1\right]`` is the reduction factor that we wish
-to achieve in the complementary measure on one step. We call ``\sigma``
-the _centering parameter_. The solution of this system for all
-positive values of ``\sigma`` and ``\nu`` define the _central path_,
-which is a trajectory that leads to the solution of the quadratic
-program as ``\sigma\nu`` tends to zero.
-
-By fixing ``\sigma_{k}`` and applying Newton's method to the system,
-we obtain the linear system
-```math
-\begin{pmatrix}Q & 0 &  A_{\textrm{eq}}^\mathsf{T} &  A_{\textrm{in}}^\mathsf{T}\\
-0 & M_{k} & 0 & Y_{k}\\
-A_{\textrm{eq}} & 0 & 0 & 0\\
-A_{\textrm{in}} & I & 0 & 0
-\end{pmatrix}\begin{pmatrix}\vec{d}_{\vec{x}}^{\left(k\right)}\\
-\vec{d}_{\vec{y}}^{\left(k\right)}\\
-\vec{d}_{\vec{\lambda}}^{\left(k\right)}\\
-\vec{d}_{\vec{\mu}}^{\left(k\right)}
-\end{pmatrix}=-\begin{pmatrix}Q\vec{x}^{\left(k\right)}+ A_{\textrm{eq}}^\mathsf{T}\vec{\lambda}^{\left(k\right)}+ A_{\textrm{in}}^\mathsf{T}\vec{\mu}^{\left(k\right)}-\vec{c}\\
-Y_{k}M_{k}\vec{1}-\sigma_{k}\nu_{k}\vec{1}\\
-A_{\textrm{eq}}\vec{x}^{\left(k\right)}-\vec{b}_{\textrm{eq}}\\
-A_{\textrm{in}}\vec{x}^{\left(k\right)}-\vec{b}_{\textrm{in}}+\vec{y}^{\left(k\right)}
-\end{pmatrix}\,.
-```
-We obtain the next iterate by setting
-```math
-\begin{pmatrix}\vec{x}^{\left(k+1\right)}\\
-\vec{y}^{\left(k+1\right)}\\
-\vec{\lambda}^{\left(k+1\right)}\\
-\vec{\mu}^{\left(k+1\right)}
-\end{pmatrix}=\begin{pmatrix}\vec{x}^{\left(k\right)}\\
-\vec{y}^{\left(k\right)}\\
-\vec{\lambda}^{\left(k\right)}\\
-\vec{\mu}^{\left(k\right)}
-\end{pmatrix}+\alpha_{k}\begin{pmatrix}\vec{d}_{\vec{x}}^{\left(k\right)}\\
-\vec{d}_{\vec{y}}^{\left(k\right)}\\
-\vec{d}_{\vec{\lambda}}^{\left(k\right)}\\
-\vec{d}_{\vec{\mu}}^{\left(k\right)}
-\end{pmatrix}\,,
-```
-where ``\alpha_{k}`` is chosen to retain the bounds ``\left(\vec{\mu}^{\left(k+1\right)},\vec{y}^{\left(k+1\right)}\right)>0``
-and possibly to satisfy various other conditions.
-
-The choices of centering parameter ``\sigma_{k}`` and step-length ``\alpha_{k}``
-are crucial for the performance of the method. Techniques for controlling
-these parameters, directly and indirectly, give rise to a wide variety
-of methods with diverse properties. One option is to use equal step
-length for the primal and dual updates, and to set ``\alpha_{k}=\min\left\{ \alpha_{k}^{\textrm{pri}},\alpha_{k}^{\textrm{dual}}\right\} ``,
-where
-```math
-\begin{aligned}
-\alpha_{k}^{\textrm{pri}} & =\max\left\{ \alpha\in\left\{ 0,1\right\} :\vec{y}^{\left(k\right)}+\alpha\vec{d}_{\vec{y}}^{\left(k\right)}\geq\left(1-\tau\right)\vec{y}^{\left(k\right)}\right\} \,,\\
-\alpha_{k}^{\textrm{dual}} & =\max\left\{ \alpha\in\left\{ 0,1\right\} :\vec{\mu}^{\left(k\right)}+\alpha\vec{d}_{\vec{\mu}}^{\left(k\right)}\geq\left(1-\tau\right)\vec{\mu}^{\left(k\right)}\right\} \,,
-\end{aligned}
-```
-the parameter ``\tau\in\left]0,1\right[`` controls how far we back
-off from the maximum step for which the conditions ``\vec{y}^{\left(k\right)}+\alpha\vec{d}_{\vec{y}}^{\left(k\right)}\geq\vec{0}``
-and ``\vec{\mu}^{\left(k\right)}+\alpha\vec{d}_{\vec{\mu}}^{\left(k\right)}\geq\vec{0}``
-are satisfied. A typical value of ``\tau=0.995`` and we can choose
-``\tau_{k}`` to approach ``1`` as the iterates approach the solution,
-to accelerate the convergence.
-
-The most popular interior-point method for convex QP is based on Mehrotra's
-predictor-corrector. First we compute an affine scaling step ``\left(\vec{d}_{\vec{x},\textrm{aff}},\vec{d}_{\vec{y},\textrm{aff}},\vec{d}_{\vec{\lambda},\textrm{aff}},\vec{d}_{\vec{\mu},\textrm{aff}}\right)``
-by setting ``\sigma_{k}=0``. We improve upon this step by computing
-a corrector step. Next, we compute the centering parameter ``\sigma_{k}``
-using following heuristic
-```math
-\sigma_{k}=\left(\frac{\nu_{\textrm{aff}}}{\nu_{k}}\right)^{3}\,,
-```
-where ``\nu_{\textrm{aff}}=\frac{ \left(\vec{y}_{\textrm{aff}}\right)^\mathsf{T}\left(\vec{\mu}_{\textrm{aff}}\right)}{p}``.
-The total step is obtained by solving the following system
-```math
-\begin{pmatrix}Q & 0 &  A_{\textrm{eq}}^\mathsf{T} &  A_{\textrm{in}}^\mathsf{T}\\
-0 & M_{k} & 0 & Y_{k}\\
-A_{\textrm{eq}} & 0 & 0 & 0\\
-A_{\textrm{in}} & I & 0 & 0
-\end{pmatrix}\begin{pmatrix}\vec{d}_{\vec{x}}^{\left(k\right)}\\
-\vec{d}_{\vec{y}}^{\left(k\right)}\\
-\vec{d}_{\vec{\lambda}}^{\left(k\right)}\\
-\vec{d}_{\vec{\mu}}^{\left(k\right)}
-\end{pmatrix}=-\begin{pmatrix}Q\vec{x}^{\left(k\right)}+ A_{\textrm{eq}}^\mathsf{T}\vec{\lambda}^{\left(k\right)}+ A_{\textrm{in}}^\mathsf{T}\vec{\mu}^{\left(k\right)}-\vec{c}\\
-Y_{k}M_{k}\vec{1}+\Delta Y_{\textrm{aff}}\Delta M_{\textrm{aff}}\vec{1}-\sigma_{k}\nu_{k}\vec{1}\\
-A_{\textrm{eq}}\vec{x}^{\left(k\right)}-\vec{b}_{\textrm{eq}}\\
-A_{\textrm{in}}\vec{x}^{\left(k\right)}-\vec{b}_{\textrm{in}}+\vec{y}^{\left(k\right)}
-\end{pmatrix}\,,
-```
-where
-```math
-\Delta Y_{\textrm{aff}}=Y_{\textrm{aff}}-Y_{k}\,,\quad\Delta M_{\textrm{aff}}=M_{\textrm{aff}}-M_{k}\,.
-```""")
+From here on, the algorithm is exactly the primal-dual construction developed
+for linear programming above (see the deep dive on interior-point methods in
+the LP section): iterates keep ``\left(\vec{\mu},\vec{y}\right)>0`` strictly
+(the origin of the term *interior point*), progress is measured through the
+_complementary measure_ ``\nu``, the perturbed KKT system is solved with Newton
+steps, and Mehrotra's predictor-corrector scheme chooses the centering
+parameter ``\sigma``. The only structural difference is that the curvature
+term ``Q`` now appears in the first block row of the Newton system.""")
 
 # ╔═╡ 7d2cb249-0d7f-4a69-9f33-4fac6e22f58b
 md"""
@@ -1905,7 +1870,7 @@ end
 # ╔═╡ 3e9afcf2-601b-4965-a738-37b4b5e2638c
 md"""
 ## Stochastic optimisation
-We have seen that most algorithm follow a greedy approach, and will find the optimum closest to the initial point, which can lead to us being stuck in a local optimum. This problem can be overcome by adding randomness to help escape local optima and increase the chances of finding a global optimum.
+We have seen that most algorithms follow a greedy approach, and will find the optimum closest to the initial point, which can lead to us being stuck in a local optimum. This problem can be overcome by adding randomness to help escape local optima and increase the chances of finding a global optimum.
 
 !!! info "Stochastic Optimisation"
 	Stochastic optimisation refers to methods that incorporate randomness to improve the search for optimal solutions, particularly to escape local optima and increase the likelihood of finding a global optimum. These methods are useful when the objective function is complex, non-convex, or has multiple local optima. Randomness is often introduced via techniques like random perturbations, simulated annealing, or genetic algorithms.
@@ -1955,21 +1920,32 @@ md"""
 
 # ╔═╡ 81955573-23b9-4af7-82bf-e6b21cdd36b7
 let
+	# ParticleSwarm draws from the global RNG (it takes no rng argument), so we
+	# seed it globally for reproducibility; the same seed also drives the local
+	# MersenneTwister used for the initial guess.
+	seed = 2025
+	Random.seed!(seed)
 	# Define the Rastrigin function
 	function rastrigin(x)
 	    A = 10
 	    return A * length(x) + sum(xi^2 - A * cos(2 * π * xi) for xi in x)
 	end
-	
+
 	# Set initial guess and bounds
 	N = 2 # dimension
-	initial_guess = rand(N) * 10 .- 5  # A random guess in the range [-5, 5]
+	rng = MersenneTwister(seed)
+	initial_guess = rand(rng, N) * 10 .- 5  # A random guess in the range [-5, 5]
 	lower_bound = -5 * ones(N)  # Lower bound for each dimension
 	upper_bound = 5 * ones(N)   # Upper bound for each dimension
 	
-	# Run PSO
+	# Run PSO (a global method): it takes the box bounds directly.
 	result = optimize(rastrigin, initial_guess, ParticleSwarm(lower=lower_bound, upper=upper_bound, n_particles=100))
-	result_nelder = optimize(rastrigin, initial_guess, NelderMead(lower=lower_bound, upper=upper_bound))
+	# Nelder-Mead is a *local*, derivative-free method. It takes no bounds:
+	# NelderMead() silently ignores lower=/upper= keywords. We therefore run it
+	# unconstrained from the same initial guess, to contrast a local search that
+	# gets trapped with the global PSO search. (For genuine box constraints one
+	# would wrap it as Fminbox(NelderMead()).)
+	result_nelder = optimize(rastrigin, initial_guess, NelderMead())
 	
 	# Display results
 	println("Optimal solution: ", Optim.minimizer(result))
@@ -1990,10 +1966,10 @@ let
 	    levels=20)
 	# Add the initial guess
 	scatter!([initial_guess[1]], [initial_guess[2]], label="Initial guess", color=:black, marker=:diamond, markersize=8)
-	# Add the PSO result + Add value ot the function in the legend label using string interpolation
+	# Add the PSO result and the objective value to the legend label.
 	scatter!([Optim.minimizer(result)[1]], [Optim.minimizer(result)[2]], label="PSO solution ($(Optim.minimum(result)))", color=:red, marker=:cross, markersize=8)
-	# Add the Nelder-Mead result
-	scatter!([Optim.minimizer(result_nelder)[1]], [Optim.minimizer(result_nelder)[2]], label="Nelder-Mead Solution ($(round(Optim.minimum(result_nelder), digits=2)))", color=:gray, marker=:hexagon, markersize=8)
+	# Add the unconstrained (local) Nelder-Mead result
+	scatter!([Optim.minimizer(result_nelder)[1]], [Optim.minimizer(result_nelder)[2]], label="Nelder-Mead local ($(round(Optim.minimum(result_nelder), digits=2)))", color=:gray, marker=:hexagon, markersize=8)
 	plot!(title="PSO Solution", xlabel="X coordinate", ylabel="Y coordinate")
 end
 
@@ -2020,12 +1996,33 @@ md"""
 	4. As the number of stochastic dimensions increases, suitable sampling approaches should be selected to keep the sampling computationally tractable.
 """
 
+# ╔═╡ ad19d771-1d49-43ca-859d-9a40342eb42f
+md"""### Simulation Optimisation
+
+In modelling and simulation, the objective function is often not a formula but a simulation output:
+
+```math
+\min_x \; \mathbb{E}\left[C(x, \omega)\right]
+```
+
+where ``x`` is the decision and ``\omega`` represents random inputs. A common practical approach is **sample average approximation**:
+
+```math
+\hat{f}_N(x) = \frac{1}{N}\sum_{s=1}^{N} C(x, \omega_s)
+```
+
+Two practical rules matter:
+
+- use enough samples to make the estimate stable;
+- when comparing candidate designs, use common random numbers where possible, so differences are caused by the design and not by different random draws.
+"""
+
 # ╔═╡ 40833da5-cfcc-4fe1-bdeb-9a1aa4b34f57
 md"""
 !!! tip "Structural design - beam deflection"
-	You might already be familiar with beam deflection from the basic mechanics courses. In practive however, both the material properties of the beam as well as the loads it is subjected to can be variable. This problem is typical in engineering, where real-world conditions often introduce variability. In current building norms, this is covered by using safety coefficients that will underestimate the material properties and overestimate the load. 
+	You might already be familiar with beam deflection from the basic mechanics courses. In practice however, both the material properties of the beam as well as the loads it is subjected to can be variable. This problem is typical in engineering, where real-world conditions often introduce variability. In current building norms, this is covered by using safety coefficients that will underestimate the material properties and overestimate the load. 
 
-	Suppose we want to minimise the weight of a beam (which depends on its length, width, and thickness). We also want the deflection of the beam must stay within limits, which is computed using a simplified beam deflection formula, subject to randomness in material properties (e.g., Young's modulus) and load (e.g., applied force).
+	Suppose we want to minimise the weight of a beam (which depends on its length, width, and thickness). We also want the deflection of the beam to stay within limits, which is computed using a simplified beam deflection formula, subject to randomness in material properties (e.g., Young's modulus) and load (e.g., applied force).
 
 	**Note:** for this simple example, we will consider a rectangular section, which is far from optimal, it simply serves to illustrate the point.
 """
@@ -2035,18 +2032,18 @@ md"""
 begin
     
     # Define the stochastic beam deflection function using lognormal distribution
-    function beam_deflection(x, material_variability=0.1, load_variability=0.2)
+    function beam_deflection(x, rng::AbstractRNG=Random.default_rng(), material_variability=0.1, load_variability=0.2)
         length, width, thickness = x
         
         # Lognormal distribution for Young's modulus
         mean_log_E = log(2e11)
         std_log_E = material_variability
-        Young_modulus = exp(randn() * std_log_E + mean_log_E)
+        Young_modulus = exp(randn(rng) * std_log_E + mean_log_E)
         
         # Lognormal distribution for applied load
         mean_log_F = log(1000)
         std_log_F = load_variability
-        applied_load = exp(randn() * std_log_F + mean_log_F)
+        applied_load = exp(randn(rng) * std_log_F + mean_log_F)
         
         # Simplified beam deflection formula
         deflection = (applied_load * length^3) / (3 * Young_modulus * width * thickness^3)
@@ -2064,11 +2061,12 @@ begin
     # Define the combined objective function with stochastic deflection
     function objective(x)
         weight = beam_weight(x)
-        # Estimate deflection with Monte Carlo
+        # Estimate deflection with common random numbers.
+		rng = MersenneTwister(2025)
         deflection = 0.0
         num_samples = 500
         for _ in 1:num_samples
-            deflection += beam_deflection(x)
+            deflection += beam_deflection(x, rng)
         end
         expected_deflection = deflection / num_samples
         
@@ -2098,10 +2096,11 @@ end
 begin
 	# Make an illustration of the beam deflection
     p = plot()
+	plot_rng = MersenneTwister(2026)
     for (i, (dimensions, label)) in enumerate([(lower_bound, "lower bounds"), (upper_bound, "upper bounds"), (initial_guess, "initial guess"), (res.minimizer, "optimal solution")])
         @info "Beam dimensions $(label): $(dimensions)"
 		# Note: we sample other values at random here, than the ones we optimized on.
-        deflection = [beam_deflection(dimensions) for _ in 1:100]
+        deflection = [beam_deflection(dimensions, plot_rng) for _ in 1:100]
         weight = [beam_weight(dimensions) for _ in 1:100]
         violin!(repeat([i], length(deflection)), deflection, label="$(label)  - $(round(Int, mean(weight))) [kg]", alpha=0.5)
     end
@@ -2124,9 +2123,9 @@ md"""
 
 	* Every sector ``j`` needs ``H_j`` patrol hours per day (``j \in {1,…,6}``).  
 	* The squadron has 10 identical UCAVs. Each can fly at most 10 h before landing for a 2 h turnaround (refuel + re-arm).  
-	* Launch and recovery happen at two airbases (A and B). Each base has 4 simultaneous ramp slots.  
+	* Launch and recovery happen at two airbases (A and B). Each base has 4 apron (parking) slots, i.e. at most 4 UCAVs can be based there on a given day.
 	* Patrolling sector ``j`` from base b consumes ``C_j^b`` kg of fuel per hour (different distances), and total daily fuel available at each base is variable ``F^b_{\text{max}}``.  
-	* While on-station, sector ``j`` exposes the aircraft to a risk score ``R_j  \in [0,1]`` (with higher being more hostile).
+	* While on-station, sector ``j`` exposes the aircraft to a risk score ``R_j^b \in [0,1]`` that depends on the **base it launched from** (different transit corridors ⇒ different exposure; higher is more hostile).
 	* Objective: satisfy all patrol-hour requirements while minimising cumulative risk-weighted flight hours.
 """
 
@@ -2137,29 +2136,29 @@ UCAP_dv_content = md"""
 	* ``x_{ij}^b``: daily flight hours that UCAV $i$ flies in sector $j$ from base $b$ (continuous and ``\ge 0``).
 	* ``u_i^b``: UCAV $i$ operates at base $b$ on a given day (binary).
 
-	Additionaly, we should also consider the following parameters:
+	Additionally, we should also consider the following parameters:
 	* ``N``= number of UCAV (10)
 	* ``j``: set of sectors (1 - 6)
 	* ``H_j``: number of daily coverage required at sector $j$.
-	* ``F``: maximum daily flight time: 20 hours, assuming this mission is running 24/7 (10 h on-station + 2 h turnaround => 2 cycles/day)
-	* ``R_j``: risk in sector $j$.
+	* ``F``: maximum daily flight time: 20 hours, assuming this mission is running 24/7 (10 h on-station + 2 h turnaround => 2 cycles/day). We model only this **daily total**, not individual sorties.
+	* ``R_j^b``: risk per patrol-hour in sector $j$ when flown from base $b$ (base-dependent).
 	* ``C_j^{b}``: fuel use (kg h⁻¹) for sector $j$ from base *b*
 	* ``F_{\max}^{b}``: fuel available at base $b$ per day (kg)
-	* ``B_{\max}``: number of simultaneous ramp slots
+	* ``B_{\max}``: apron (parking) slots per base — a daily head-count cap on based UCAVs
 	"""
 	UCAP_dv = PlutoUI.details("Variables", UCAP_dv_content, open=false)
 
 UCAP_obj_content = md"""
 We want to minimize the risk-weighted exposure
 ```math
-\min \; \sum_{i=1}^{N}\sum_{b\in\{A,B\}}\sum_{j=1}^{6} R_j \, x_{ij}^{b},
+\min \; \sum_{i=1}^{N}\sum_{b\in\{A,B\}}\sum_{j=1}^{6} R_j^{b} \, x_{ij}^{b},
 ```
-where $i$ is the index of the UCAP, and $b$ the index assigment to the base.	
+where $i$ is the index of the UCAP, and $b$ the index assignment to the base. Because the risk now depends on the base, the model genuinely trades safer transit corridors against each base's fuel budget $F_{\max}^b$ and apron capacity, so the optimum is no longer the base-independent constant $\sum_j R_j H_j$.	
 """
 	UCAP_obj = PlutoUI.details("Objective function", UCAP_obj_content, open=false)
 	
 UCAP_constraints_content = md"""
-We from the problem description, we can identify the following constraints:
+From the problem description, we can identify the following constraints:
 1. sufficient patrol hour coverage	
 ```math
 \sum_{i=1}^{N}\sum_{b\in\{A,B\}} x_{ij}^{b} \;\; \ge \;\; H_j, 
@@ -2170,14 +2169,14 @@ We from the problem description, we can identify the following constraints:
 \sum_{b}\sum_{j} x_{ij}^{b} \;\; \le \;\; F,
 \qquad \forall i=1,\dots,N
 ```	
-3. physical limitations of a specific base:
+3. apron (parking) capacity at each base:
 ```math
 \sum_{i=1}^{N} u_{i}^{b} \;\; \le \;\; B_{\text{max}},
 \qquad b\in\{A,B\}
 ```		
-4. each UVAC can be on one base only
+4. each UCAV is based at **at most one** base (it may stay in reserve)
 ```math
-\sum_{b} u_{i}^{b} = 1 \qquad \forall i
+\sum_{b} u_{i}^{b} \le 1 \qquad \forall i
 ```	
 5. allocated flight times should be linked to the base the UCAV is assigned to
 ```math
@@ -2194,34 +2193,48 @@ end
 
 # ╔═╡ 5319e52e-f9ff-4aac-8bc9-8dfa378ce2cd
 let
+	rng = MersenneTwister(2026)
 	N = 10 # number of UCAV
-	J = 6  # number ofsectors
+	J = 6  # number of sectors
 	B = 2  # number of bases
 	F = 20 # flight time per day for a single UCAV
 	model = Model(GLPK.Optimizer)
-	H = rand(2:24, J) # minimal daily coverage
-	R = rand(J)      # risk factor
-	B_max = 5 # number of simultaneous ramps
-	C = hcat(rand(20:50, J), rand(40:80, J))
-	F_max = [1500;2500]
+	H = rand(rng, 8:18, J) # minimal daily coverage
+	# risk per patrol-hour depends on the LAUNCHING BASE (transit-corridor exposure)
+	R = round.(hcat(rand(rng, J), rand(rng, J)), digits=2) # risk factor, size J×B
+	B_max = 4 # apron / parking slots per base (daily head-count cap)
+	C = hcat(rand(rng, 20:50, J), rand(rng, 40:80, J))
+	F_max = [2500;3000]
 	@variable(model, x[1:N, 1:J, 1:B] ≥ 0)
 	@variable(model, u[1:N, 1:B], Bin)
 	
-	@objective(model, Min, sum(R[j] * x[i,j,b] for i in 1:N, j in 1:J, b in 1:B))
+	@objective(model, Min, sum(R[j,b] * x[i,j,b] for i in 1:N, j in 1:J, b in 1:B))
 	
 	@constraint(model, [j in 1:J],   sum(x[i,j,b] for i in 1:N, b in 1:B) ≥ H[j])
-	@constraint(model, [i in 1:N],   sum(x[i,j,b] for j in J, b in 1:B) ≤ F)
+	@constraint(model, [i in 1:N],   sum(x[i,j,b] for j in 1:J, b in 1:B) ≤ F)
 	@constraint(model, [b in 1:B],   sum(u[i,b]   for i in 1:N) ≤ B_max)
-	@constraint(model, [i in 1:N],   sum(u[i,b]   for b in 1:B)  == 1)
+	@constraint(model, [i in 1:N],   sum(u[i,b]   for b in 1:B)  ≤ 1)  # ≤ one base; may stay in reserve
 	@constraint(model, [i in 1:N, j in 1:J, b in 1:B],     x[i,j,b] ≤ F * u[i,b])
 	@constraint(model, [b in 1:B],   sum(C[j,b] * x[i,j,b] for i in 1:N, j in 1:J) ≤ F_max[b])
 	
 	optimize!(model)
 
 	if termination_status(model) == OPTIMAL
-		@info value.(x)
+		x_val = value.(x)
+		coverage = [sum(x_val[i,j,b] for i in 1:N, b in 1:B) for j in 1:J]
+		flight_time = [sum(x_val[i,j,b] for j in 1:J, b in 1:B) for i in 1:N]
+		fuel_use = [sum(C[j,b] * x_val[i,j,b] for i in 1:N, j in 1:J) for b in 1:B]
+		deployed = [round(Int, sum(value(u[i,b]) for i in 1:N)) for b in 1:B]
+		sector_base = [round(sum(x_val[i,j,b] for i in 1:N), digits=1) for j in 1:J, b in 1:B]
+		@info jump_report(model)
+		@info "Coverage required/allocated: $(collect(zip(H, round.(coverage, digits=2))))"
+		@info "Maximum UCAV flight time used: $(round(maximum(flight_time), digits=2)) / $F"
+		@info "Fuel used/capacity: $(collect(zip(round.(fuel_use, digits=2), F_max)))"
+		@info "UCAVs deployed per base (≤ $B_max): $deployed"
+		@info "Patrol-hours per sector, split by base [A B]" sector_base
+		x_val
 	else
-		@warn "No optimal solution could be found 🤬" 
+		@warn "No optimal solution could be found. Status: $(termination_status(model))" 
 	end
 end
 
@@ -2239,21 +2252,21 @@ md"## Electronic Warfare (EW) asset assignment under uncertainty"
 md"""
 !!! tip ""
 	You are supporting a mission with EW assets that will be used to saturate the adversary's early warning radars (EWR), in order to help facilitate a strike undetected. You have two airborne jammer assets that fly out from an aircraft carrier. Once in place, they orbit their loiter point for 90 minutes before heading back to the carrier.
-	Your task is to find a positioning of the jammer assets that saturates the EWRs, and at the same time, we want to __maximise the expected residual jamming margin__, in order to be able to take on additional taskings.
+	Your task is to find a positioning of the jammer assets that __reliably saturates the EWRs__ — each EWR should be jammed with at least __90 % confidence__ despite the uncertain ducting — while spending as __little fuel__ as possible, so the assets retain the maximum __residual endurance for additional taskings__.
 
 
 	**Mission specifics**:
 	* The carrier is located in (0, -150);
-	* Adversary EWRs are located at (0,0), (120, 50), and (210, 30). An EWR is out-of-service, if the combination of the receiver power (i.e. the sum) from the jammers exceeds ``S_{\text{min}} = 1.8 \times 10^{-4} [Wm^{-2}]``;
+	* Adversary EWRs are located at (0,0), (120, 50), and (210, 30). An EWR is out-of-service if the combination of the received power from the jammers exceeds ``S_{\text{min}} = 1.8 \times 10^{-5} [Wm^{-2}]``;
 	* The jammer assets need to stay within a 300km range from the carrier;
 	* The EWR ``j`` receives an instantaneous power density from jammer ``h`` as follows:
 	  ```math
 	  S_{hj}(\omega) = \frac{P_h}{4\pi d_{hj}^2} \kappa(\omega),
 	  ```
-	  where ``P_h`` is the power transmitted from jammer ``h``, ``d_{hj}`` is the distance between the jammer and the EWR, and ``\kappa(\omega)`` a an [atmospheric ducting](https://en.wikipedia.org/wiki/Atmospheric_duct) multiplier. ``\kappa(\omega)`` follows a [log-normal distribution](https://en.wikipedia.org/wiki/Log-normal_distribution), centered on ``0``, with a standard deviation of ``0.25``;
+	  where ``P_h`` is the power transmitted from jammer ``h``, ``d_{hj}`` is the distance between the jammer and the EWR, and ``\kappa(\omega)`` is an [atmospheric ducting](https://en.wikipedia.org/wiki/Atmospheric_duct) multiplier. ``\kappa(\omega)`` follows a [log-normal distribution](https://en.wikipedia.org/wiki/Log-normal_distribution), whose natural logarithm is normally distributed with mean ``0`` and standard deviation ``0.25`` (so ``\kappa`` is positive with median ``1``);
 	* The jammers have a limited amount of fuel (7 tonnes). For a specific loiter point for asset ``h``, the fuel consumption can be modelled as follows:
 	  ```math
-	  F_h = 1.2 + 0.06 d_h + 2 P_h^{1.3},
+	  F_h = 1.2 + 0.006 d_h + 2 P_h^{1.3},
 	  ```
 	  where ``d_h`` is the distance between the loiter point of asset ``h`` and the carrier, and ``P_h`` is the power transmitted from jammer ``h``
 
@@ -2261,58 +2274,46 @@ md"""
 """
 
 # ╔═╡ fa9e13f2-de57-4edb-9952-6cc1ad1ee412
-let	
-	# Define the received_power function
+let
+	# received power at a point from one jammer, given ducting multiplier k
 	function received_power(loiter_point, P, target, k)
-	    d = sqrt((loiter_point[1] - target[1])^2 + (loiter_point[2] - target[2])^2)
-	    d = max(d, 1e-2) # Increase minimum distance to reduce max Z
-	    S = P / (4 * π * d^2) * k
-	    return S
+		d = sqrt((loiter_point[1] - target[1])^2 + (loiter_point[2] - target[2])^2)
+		d = max(d, 1e-2)
+		return P / (4 * π * d^2) * k
 	end
-	
-	# Define parameters
+
+	# parameters (illustrative placement; powers on the same O(1) scale as the model below)
 	carrier = (0, -150)
 	rₕ = 300
 	EWR = [(0, 0), (120, 50), (210, 30)]
-	assets = [(-150, -50), (150, -50)]
-	P = [0.0002, 0.00015] # power per asset
-	κ = LogNormal(0, 0.25)
-	k = rand(κ) # Sample k from LogNormal distribution
-	
-	# Create grid of coordinates
+	assets = [(0, -10), (165, 40)]
+	P = [0.1, 0.7]          # power per asset (W)
+	S_min = 1.8e-5
+	k = 1.0                 # median atmospheric ducting (κ = 1)
+
+	# grid
 	x = -300:5:300
 	y = -200:5:200
-	
-	# Create grid
-	X = [xi for xi in x, _ in y]
-	Y = [yi for _ in x, yi in y]
-	
-	# Compute received power from each asset for each point in the grid
-	Z = [received_power(assets[1], P[1], (xi,yi), k) for xi in x, yi in y] .+ 
+
+	# combined received power from both assets at each grid point
+	Z = [received_power(assets[1], P[1], (xi,yi), k) for xi in x, yi in y] .+
 		[received_power(assets[2], P[2], (xi,yi), k) for xi in x, yi in y]
-	
-	
-	# Clip Z to avoid extremely large values and ensure positive (some artifacts with close points)
 	Z = clamp.(Z, 1e-10, 1e5)
-	
-	# Create combined plot
-	p = contour(x, y, log10.(Z'), # Transpose Z to match x[i], y[j]
-	    fill=true, 
-	    color=:turbo, 
-	    clims=(-10, -2), # Limit log10(Z) to [-5, 0] (10^-5 to 10^0 W/m²)
-	    colorbar_ticks=([-5, -4, -3, -2, -1, 0], [L"10^{-5}", L"10^{-4}", L"10^{-3}", L"10^{-2}", L"10^{-1}", L"10^{0}"]),
-	    title="Received Power (RP) contour plot",
-	    xlabel="X",
-	    ylabel="Y",
-	    colorbar_title=L"\log_{10}(RP) \; [W/m^2]",
-	    levels=9, 
-	    right_margin=10mm)
+
+	contour(x, y, log10.(Z'),
+		fill=true, color=:turbo, clims=(-6, 0),
+		colorbar_ticks=([-5, -4, -3, -2, -1, 0], [L"10^{-5}", L"10^{-4}", L"10^{-3}", L"10^{-2}", L"10^{-1}", L"10^{0}"]),
+		title="Received Power (RP) contour plot",
+		xlabel="X", ylabel="Y",
+		colorbar_title=L"\log_{10}(RP) \; [W/m^2]",
+		levels=12, right_margin=10mm)
+	contour!(x, y, log10.(Z'); levels=[log10(S_min)], color=:white, linestyle=:dash, colorbar_entry=false)
 	scatter!(carrier, label="Carrier", color=:grey, alpha=1., marker=:square, markersize=8)
 	scatter!(assets, label="Jammers", color=:grey, alpha=1., marker=:cross, markersize=8)
-	plot!(carrier[1] .+ rₕ .* cos.(range(0, 2*pi, length=100)), carrier[2] .+ rₕ .* sin.(range(0, 2*pi, length=100)), 
+	plot!(carrier[1] .+ rₕ .* cos.(range(0, 2*pi, length=100)), carrier[2] .+ rₕ .* sin.(range(0, 2*pi, length=100)),
 	      color=:grey, alpha=0.5, linestyle=:dash, label="Asset deployment range")
 	scatter!(EWR, label="EWR", color=:red, marker=:diamond, markersize=8)
-	plot!(xlims=(-300, 300), ylims=(-200, 200)) # Set limits for x and y axes
+	plot!(xlims=(-300, 300), ylims=(-200, 200))
 end
 
 # ╔═╡ 40d9a168-0821-4d7e-b8c2-38f8ba7d27a3
@@ -2322,14 +2323,15 @@ For this application, we can consider two different approaches because the stoch
 
 1. Use the known distribution:
 
-   Suppose we want to be fairly certain to suppress the adversary EWRs with our EW measures, for example, 90% sure that we will jam enough. You can simply use the inverse of the log-normal distribution, i.e., find ``x`` such that ``P(X \\leq x) = 0.90``, with ``X \\sim \\text{Lognormal}(\\mu=0, \\sigma=0.25)``. We could call this ``\\kappa_{\\text{crit}}``
+   Suppose we want to be fairly certain to suppress the adversary EWRs, e.g. 90% sure we jam enough. Since the received power is proportional to ``\\kappa``, being 90% sure of saturation means we must still succeed in the **unfavourable low-ducting tail**. So we design at the 10th percentile of ``\\kappa``: find ``\\kappa_{\\text{crit}}`` such that ``P(X \\le \\kappa_{\\text{crit}}) = 0.10``, with ``X \\sim \\text{Lognormal}(\\mu=0, \\sigma=0.25)``. Equivalently, the median-ducting field must clear a **safety factor** ``1/\\kappa_{\\text{crit}} = \\text{quantile}(X, 0.90) \\approx 1.3777`` above ``S_{\\text{min}}``.
 
    ```julia
    dist = LogNormal(0, 0.25)
-   x = quantile(dist, 0.90)
+   κ_crit = quantile(dist, 0.10)   # unfavourable ducting we must still jam through
+   safety = 1 / κ_crit             # = quantile(dist, 0.90)
    ```
    ```
-   1.3776620439479017
+   (κ_crit, safety) = (0.7258674247381793, 1.377662043947902)
    ```
 
 								 
@@ -2346,18 +2348,20 @@ For this application, we can consider two different approaches because the stoch
 
 EW_dv_content = md"""
 	We can identify the following decision variables: ``(x_h, y_h, P_h), \; h \in [1, 2]``, 
-	associated with the horizontal and vertical position, and the emited power of every asset respectively.
+	associated with the horizontal and vertical position, and the emitted power of every asset respectively.
 
 	We can also define the threshold power required for saturation of the adversaries' EWRs: ``S_{\text{min}} = 1.8 \times 10^{-5} [Wm^{-2}]``
 	"""
 	EW_dv = PlutoUI.details("Variables", EW_dv_content, open=false)
 
 EW_obj_content = md"""
-Suppose we are using the sampling approach, the objective function expressing the expected residual jamming capacity can be written as follows:
+The mission wants the assets kept ready for follow-on taskings, so we **minimise the total fuel** spent while still guaranteeing the EWRs are jammed:
 ```math
-\max_{x_h, y_h, P_h} \frac{1}{N} \sum_{s=1}^{N} \sum_{j=1}^{3} \left( \sum_{h=1}^{2}\frac{P_h \kappa_s}{4\pi d_{hj}^2} - S_{\text{min}} \right)_{+},
+\min_{x_h, y_h, P_h} \sum_{h=1}^{2} \left( 1.2 + 0.006\, d_h + 2 P_h^{1.3} \right),
 ```
-where $h$ indicates the index of the EW assets, $j$ indicates the index of the EWRs, and $s$ indicates the index of atmospheric conduct parameter. The notation $(\cdot)_+ = \max{(0, \cdot)}$, this makes sure that the residual value is positive.
+where $h$ indexes the two EW assets and $d_h$ is the distance of asset $h$ to the carrier. The **residual capacity** for additional taskings is then the spare fuel ($7 - F_h$) and spare power ($6 - P_h$) each asset retains.
+
+Why not literally *maximise the expected residual margin* $\frac{1}{N}\sum_{s}\sum_{j}\left(\sum_{h}\frac{P_h \kappa_s}{4\pi d_{hj}^2}-S_{\text{min}}\right)_{+}$ ? Because it is **unbounded**: as a jammer flies onto an EWR, $d_{hj}\to 0$ and the margin $\to\infty$, so the "optimum" is to sit on top of a radar. Minimising resources subject to a firm saturation guarantee is the stable, meaningful formulation.
 """
 	EW_obj = PlutoUI.details("Objective function", EW_obj_content, open=false)
 	
@@ -2368,9 +2372,15 @@ Again, assuming we are using the sampling approach, we can write the constraint 
 ```
 In the above equation, $\mathbf{1}$ is the [indicator function](https://en.wikipedia.org/wiki/Indicator_function), which returns one if the argument is true, and zero otherwise.
 
+Because $\kappa$ is a single common multiplier and the received power is monotone in it, this chance constraint has an exact **deterministic equivalent**: guarantee saturation at the 10th-percentile ducting $\kappa_{\text{crit}} \approx 0.726$ (see the *Dealing with uncertainty* box):
+```math
+\kappa_{\text{crit}} \sum_{h=1}^{2}\frac{P_h}{4\pi d_{hj}^2} \ge S_{\text{min}} \;\; \forall j = 1,2,3,
+```
+which is what the model below actually solves.
+
 The fuel constraints are obtained almost directly from the problem statement:
 ```math
-1.2 + 0.06 d_h + 2 P_h^{1.3} \le 7  \;\; \forall h = 1,2.
+1.2 + 0.006 d_h + 2 P_h^{1.3} \le 7  \;\; \forall h = 1,2.
 ```
 
 The emission constraints are also directly obtained:
@@ -2378,11 +2388,11 @@ The emission constraints are also directly obtained:
 0 \le P_h \le 6  \;\; \forall h = 1,2.
 ```	
 
-Finally, we should also make sure our assest remain within recoverable distance of the carrier:
+Finally, we should also make sure our assets remain within recoverable distance of the carrier:
 ```math
-0 \le \sqrt{(x_h - x_c)^2 + (y_c - y_c)^2} \le 300  \;\; \forall h = 1,2.
+0 \le \sqrt{(x_h - x_c)^2 + (y_h - y_c)^2} \le 300  \;\; \forall h = 1,2.
 ```	
-In the above equation $(x_c, y_c)$ refers to the carrier position.
+In the above equation $(x_c, y_c)$ refers to the carrier position. (In the code, the $\pm 300$ box on $x_h, y_h$ is only a solver helper; the actual limit is this range constraint $d_h \le 300$.)
 	
 """
 EW_constraints = PlutoUI.details("Constraints", EW_constraints_content, open=false)
@@ -2390,117 +2400,95 @@ EW_constraints = PlutoUI.details("Constraints", EW_constraints_content, open=fal
 end
 
 # ╔═╡ 3b379685-636b-48b6-b797-5c4fce3ddc8d
-let	
+let
+	# received power at an EWR from one jammer, given ducting multiplier k
 	function received_power(loiter_point, P, target, k)
-	# Calculate the distance from the loiter point to the target EWR
-    d = sqrt((loiter_point[1] - target[1])^2 + (loiter_point[2] - target[2])^2)
-	# Calculate the received power at the target EWR, accounting for the atmospheric ducting multiplier
-	S = P / (4 * π * d^2) * k
-	return S
+		d = sqrt((loiter_point[1] - target[1])^2 + (loiter_point[2] - target[2])^2)
+		d = max(d, 1e-2)
+		return P / (4 * π * d^2) * k
 	end
-		
-	# Define parameters
-	(x_c, y_c) = (0, -150) 		# carrier location
-	rₕ = 300 					# max radius from carrier
-	P_max = 6 				 	# max power emission
-	P_jam = 0.9 				# desired certainty of jamming the EWRs
-	EWR = [(0, 0), 				# EWR locations	
-		   (120, 50), 
-		   (210, 30)]
+
+	# scenario parameters
+	(x_c, y_c) = (0.0, -150.0)   # carrier location
+	rₕ = 300.0                   # max range from carrier
+	P_max = 6.0                  # max power emission
+	conf = 0.90                  # required saturation confidence
+	EWR = [(0.0, 0.0), (120.0, 50.0), (210.0, 30.0)]
 	S_min = 1.8e-5
-	κ = LogNormal(0, 0.25)
-	N = 10  					# number of samples
-	k = rand(κ, N) 				# Atmospheric conduct coefficient sample
+	κ = LogNormal(0, 0.25)       # atmospheric ducting multiplier
+	q10 = quantile(κ, 1 - conf)  # unfavourable low-ducting design point (≈ 0.726)
+	reg = 1e-3                   # numerical floor on squared distance
 
 	# setup model
 	model = Model(Ipopt.Optimizer)
-	set_attribute(model, "print_level", 0) # to limit the solver's output
-	set_optimizer_attribute(model, "max_iter", 3000) # set max iterations for the solver
+	set_attribute(model, "print_level", 0)      # limit solver output
+	set_attribute(model, "max_iter", 3000)
 
-	@variable(model, x[1:2]) # asset horizontal location
-	set_start_value(x[1], 20)
-	set_start_value(x[2], 50)
-	@variable(model, y[1:2]) # asset vertical location
-	set_start_value(y[1],50)
-	set_start_value(y[2],30)
-	@variable(model, P[1:2]) # power emission
-	set_start_value(P[1], 0.2)
-	set_start_value(P[2], 0.5)
+	@variable(model, -300 ≤ x[1:2] ≤ 300)       # asset horizontal location (range enforced below)
+	@variable(model, -300 ≤ y[1:2] ≤ 300)       # asset vertical location
+	@variable(model, 0 ≤ P[1:2] ≤ P_max)        # power emission
+	set_start_value(x[1], 0);   set_start_value(y[1], -10)   # guide jammer 1 toward EWR1
+	set_start_value(x[2], 165); set_start_value(y[2], 40)    # guide jammer 2 between EWR2 and EWR3
+	set_start_value(P[1], 0.1); set_start_value(P[2], 0.7)
 
-	# add objective
-	@NLobjective(model, Max, sum(sum(max(0, P[h] * k[s] / (4 * pi * sqrt((x[h] - EWR[j][1])^2 + (y[h] - EWR[j][2])^2) + 1e-3) - S_min) for h in 1:length(x)) for j in 1:length(EWR), s in 1:N))
+	# objective: least fuel  ->  preserve residual endurance for follow-on taskings
+	@NLobjective(model, Min,
+		sum(1.2 + 0.006 * sqrt((x[h]-x_c)^2 + (y[h]-y_c)^2 + reg) + 2 * P[h]^1.3 for h in 1:2))
 
-	
-	# add constraints
+	# 90% saturation of each EWR, written as the EXACT deterministic (low-quantile) equivalent of
+	# the chance constraint  P( κ · Σ_h P_h/(4π d²) ≥ S_min ) ≥ conf   (κ common & monotone)
 	for j in 1:length(EWR)
-		# exact version (some issues with the double inequality, can be solved by transforming into a mixed integer problem)
-		#@constraint(model, sum( P[h] * k[s] / (4 * pi * sqrt((x[h] - EWR[j][1])^2 + (y[h] - EWR[j][2])^2)) ≥ S_min for h in 1:length(x), s in 1:N) / N ≥ P_jam)
-		# simplified version
-		@NLconstraint(model, sum(P[h] * k[s] / (4 * pi * sqrt((x[h] - EWR[j][1])^2 + (y[h] - EWR[j][2])^2)  + 1e-3 ) for h in 1:length(x), s in 1:N) / N ≥ P_jam * S_min)
+		@NLconstraint(model,
+			q10 * sum(P[h] / (4π * ((x[h]-EWR[j][1])^2 + (y[h]-EWR[j][2])^2 + reg)) for h in 1:2) ≥ S_min)
 	end
-	for h in 1:length(x)
-		d_h = sqrt( (x_c - x[h])^2 + (y_c - y[h])^2  + 1e-3)
+	# range from carrier and fuel budget per asset
+	for h in 1:2
+		d_h = @NLexpression(model, sqrt((x_c-x[h])^2 + (y_c-y[h])^2 + reg))
 		@NLconstraint(model, d_h ≤ rₕ)
-		@NLconstraint(model, 1.2 + 0.06 * d_h + 2 * P[h] ^ (1.3) ≤ 7)
-		@NLconstraint(model, P[h] ≥ 0) # power emission must be non-negative
-		@NLconstraint(model, P[h] ≤ P_max) # power emission must be less than max
-		@constraint(model, x[h] >= -300) # asset horizontal location must be greater than -300
-		@constraint(model, x[h] <= 300) # asset horizontal location must be less than 300
-		@constraint(model, y[h] >= -300) # asset vertical location must be greater than -450
-		@constraint(model, y[h] <= 300) # asset vertical location must be less than 150
+		@NLconstraint(model, 1.2 + 0.006 * d_h + 2 * P[h]^1.3 ≤ 7)
 	end
-	
-	@NLconstraint(model, sqrt((x[1] - x[2])^2 + (y[1] - y[2])^2) ≥ 100) # ensure a minimum distance between the two assets
 
-	# Optimize
-    optimize!(model)
+	optimize!(model)
+	@info jump_report(model)
 
-	@info termination_status(model)
+	# results
+	x_opt = value.(x); y_opt = value.(y); P_opt = value.(P)
+	# per-EWR field coefficient A_j so that the (random) received power is κ · A_j
+	A = [sum(P_opt[h] / (4π * ((x_opt[h]-EWR[j][1])^2 + (y_opt[h]-EWR[j][2])^2 + reg)) for h in 1:2) for j in 1:3]
+	sat_conf  = [1 - cdf(κ, S_min / A[j]) for j in 1:3]                # achieved confidence per EWR
+	fuel_used = [1.2 + 0.006*sqrt((x_opt[h]-x_c)^2+(y_opt[h]-y_c)^2) + 2*P_opt[h]^1.3 for h in 1:2]
+	@info "Optimal jammer positions: $(collect(zip(round.(x_opt, digits=1), round.(y_opt, digits=1))))"
+	@info "Optimal power emissions: $(round.(P_opt, digits=3)) (P_max = $P_max)"
+	@info "Design-case (10th-pct ducting) received power vs S_min: $(collect(zip(round.(A .* q10, sigdigits=3), fill(S_min, 3))))"
+	@info "Achieved saturation confidence per EWR (target ≥ $conf): $(round.(sat_conf, digits=3))"
+	@info "Residual capacity — spare fuel: $(round.(7 .- fuel_used, digits=2)) t, spare power: $(round.(P_max .- P_opt, digits=2))"
 
-	# Get results
-	x_opt = value.(x)
-	y_opt = value.(y)
-	P_opt = value.(P)
-	@info "Optimal asset locations: $(x_opt), $(y_opt)"
-	@info "Optimal power emissions: $(P_opt)"
+	# Monte-Carlo cross-check of the confidence (the 'sampling' approach)
+	Msamp = 10_000
+	ks = rand(MersenneTwister(2026), κ, Msamp)
+	emp = [round(mean(ks .* A[j] .≥ S_min), digits=3) for j in 1:3]
+	@info "Empirical saturation frequency ($Msamp samples): $emp"
 
-	# Plot results
-	plot()
-	# Create grid of coordinates
-	xx = -300:5:300
-	yy = -500:5:200
-
-	# Create grid
-	X = [xi for xi in xx, _ in yy]
-	Y = [yi for _ in xx, yi in yy]
-
-	# Compute received power for each point in the grid
-	Z = [received_power((x_opt[1], y_opt[1]), P_opt[1], (xi,yi), k[1]) for xi in xx, yi in yy] .+ 
-		[received_power((x_opt[2], y_opt[2]), P_opt[2], (xi,yi), k[2]) for xi in xx, yi in yy]
-
-
-	# Clip Z to avoid extremely large values and ensure positive
+	# plot the received-power field at the DESIGN ducting κ_crit (= q10): the S_min saturation
+	# contour then passes exactly through each EWR (each constraint binds at S_min there)
+	xx = -100:5:300
+	yy = -200:5:200
+	Z = [sum(received_power((x_opt[h], y_opt[h]), P_opt[h], (xi, yi), q10) for h in 1:2) for xi in xx, yi in yy]
 	Z = clamp.(Z, 1e-10, 1e5)
-
-	# Create combined plot
-	contour(xx, yy, log10.(Z'), # Transpose Z to match x[i], y[j]
-    fill=true, 
-    color=:turbo, 
-    clims=(-6, 0), # Limit log10(Z) to [-5, 0] (10^-5 to 10^0 W/m²)
-    colorbar_ticks=([-5, -4, -3, -2, -1, 0], [L"10^{-5}", L"10^{-4}", L"10^{-3}", L"10^{-2}", L"10^{-1}", L"10^{0}"]),
-    title="Received Power (RP) contour plot",
-    xlabel="X",
-    ylabel="Y",
-    colorbar_title=L"\log_{10}(RP) \; [W/m^2]",
-    levels=12, 
-    right_margin=10mm)
-	scatter!([x_c], [y_c], label="Carrier", color=:green, alpha=0.5, marker=:square, markersize=8)
-	scatter!([(x_opt[i], y_opt[i]) for i in 1:length(x_opt)], label="Jammers", color=:green, alpha=0.5, marker=:circle, markersize=8)
-	plot!(x_c .+ rₕ .* cos.(range(0, 2*pi, length=100)), y_c .+ rₕ .* sin.(range(0, 2*pi, length=100)), color=:green, alpha=0.5, linestyle=:dash, label="Asset deployment range")
-	# add carrier, jammers, and EWRs
+	contour(xx, yy, log10.(Z'),
+		fill=true, color=:turbo, clims=(-6, 0), levels=12, right_margin=12mm,
+		colorbar_ticks=([-5, -4, -3, -2, -1, 0], [L"10^{-5}", L"10^{-4}", L"10^{-3}", L"10^{-2}", L"10^{-1}", L"10^{0}"]),
+		title="Optimal Asset Deployment (10th-pct ducting)",
+		xlabel="X coordinate", ylabel="Y coordinate",
+		colorbar_title=L"\log_{10}(RP) \; [W/m^2]")
+	# overlay the S_min level as a dashed line WITHOUT clearing the colorbar (per-series flag)
+	contour!(xx, yy, log10.(Z'); levels=[log10(S_min)], color=:white, linestyle=:dash, colorbar_entry=false)
+	scatter!([x_c], [y_c], label="Carrier", color=:green, alpha=0.7, marker=:square, markersize=8)
+	scatter!([(x_opt[i], y_opt[i]) for i in 1:2], label="Jammers", color=:grey, alpha=0.7, marker=:cross, markersize=8)
+	plot!(x_c .+ rₕ .* cos.(range(0, 2*pi, length=100)), y_c .+ rₕ .* sin.(range(0, 2*pi, length=100)),
+		  color=:green, alpha=0.5, linestyle=:dash, label="Asset deployment range")
 	scatter!([(EWR[i][1], EWR[i][2]) for i in 1:length(EWR)], label="EWR", color=:red, marker=:diamond, markersize=8)
-
-	plot!(title="Optimal Asset Deployment (local optimum)", xlabel="X coordinate", ylabel="Y coordinate")
+	plot!(xlims=(-100, 300), ylims=(-200, 200), title="Optimal Asset Deployment \n (10th-pct ducting, S_min contour dashed)", top_margin=8mm)
 end
 
 # ╔═╡ cb948119-db02-441a-86ec-d50a7c34983f
@@ -2508,7 +2496,7 @@ md"""
 !!! warning "Go beyond - food for thought"
 	* is the number of samples we used adequate?
 	* what is the impact of the shape of the distribution?
-	* how to add additional contrainst? E.g. a no-fly zone?
+	* how to add additional constraints? E.g. a no-fly zone?
 	* could other solution methods also be suited? If so, which ones, and why?
 """
 
@@ -2517,6 +2505,8 @@ md"""
 # ╟─ddac3c21-7ac9-4295-aeca-a8f460c1f3b1
 # ╠═27e916ea-958c-4df8-b861-b2674798cee9
 # ╟─7f3b10fe-8a8e-49ba-a468-a7fa0cb8c17d
+# ╟─58a07465-ad20-4994-8622-13dd3d24a054
+# ╟─0fb23b4c-b85f-4202-873c-ff477865e1af
 # ╟─19bc12c5-2d3c-46dc-bb9b-02efe0882295
 # ╟─3e7cdf87-e064-4746-abd3-8ca6a702a0fe
 # ╟─561c3509-a1d4-43f4-a1ba-a55dbdfb0620
@@ -2528,6 +2518,7 @@ md"""
 # ╠═b1144ca2-087c-4ba7-ae77-ae9b6073a642
 # ╠═102e0051-dbfb-45e0-871d-db0a0d07abb1
 # ╠═86e70877-1f9c-4634-9f5a-94659bfab519
+# ╟─9089f56d-805b-4654-861d-65359972a72e
 # ╟─d4b05c5e-ac08-4a69-b54c-5d825d864bfa
 # ╟─1450d898-5e03-4b54-a1ba-bf3d0f659d25
 # ╟─9e9a1b5c-a78f-414c-b99e-328e96061542
@@ -2535,6 +2526,8 @@ md"""
 # ╟─110a345d-70dd-40eb-bc1f-1a4d4c9c1926
 # ╟─22915619-cd8f-4fef-a328-3cb7ba999946
 # ╟─a768a6d1-b9af-4c42-877b-9eb55cdee7d8
+# ╟─74acf321-9b1d-4ff9-9041-6b5a5f8c6ecd
+# ╠═4ffe059d-63b9-45e3-95e2-8965b34e359a
 # ╟─65ad9943-df85-43b2-aa28-f6e91da11e83
 # ╟─b0d7d73b-49ba-45f6-9547-72b47c1f51ba
 # ╟─1af7b9e6-43e0-4f32-b0bc-2bd5edd52c8a
@@ -2567,6 +2560,7 @@ md"""
 # ╟─d85aaa13-555a-465f-8f8e-3732978cae7c
 # ╟─81955573-23b9-4af7-82bf-e6b21cdd36b7
 # ╟─053779d8-056b-46fe-bee8-c151132639c1
+# ╟─ad19d771-1d49-43ca-859d-9a40342eb42f
 # ╟─40833da5-cfcc-4fe1-bdeb-9a1aa4b34f57
 # ╟─e41e416c-f687-4493-9266-d107145b1f7e
 # ╟─5be46829-11b4-4705-b3f8-9bced947f307
@@ -2579,5 +2573,5 @@ md"""
 # ╟─868942c1-c331-43de-9751-94d34df64d0e
 # ╟─fa9e13f2-de57-4edb-9952-6cc1ad1ee412
 # ╟─40d9a168-0821-4d7e-b8c2-38f8ba7d27a3
-# ╟─3b379685-636b-48b6-b797-5c4fce3ddc8d
+# ╠═3b379685-636b-48b6-b797-5c4fce3ddc8d
 # ╟─cb948119-db02-441a-86ec-d50a7c34983f

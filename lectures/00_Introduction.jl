@@ -66,17 +66,17 @@ begin
 		!!! tip "Objective setting"
 			What specific outcomes, metrics, or insights are desired from the M&S effort?
 			
-			E.g. predict throughput, minimize waiting time, compare strategies, understand sensitivity).
+			E.g. predict throughput, minimize waiting time, compare strategies, understand sensitivity.
 		"""
 	problem = PlutoUI.details("Problem definition & objective setting", problem_content, open=false)
 
 	system_analysis_content = md"""
 		* Information gathering: data, expert knowledge, and existing theories about the system's components, behaviors, interactions, and environment.
-		* Indentify key elements: determine the crucial entities, variables, parameters, relationships, and processes that influence the system's behavior relevant to the objectives.
+		* Identify key elements: determine the crucial entities, variables, parameters, relationships, and processes that influence the system's behavior relevant to the objectives.
 
 		This study can lead to a "conceptual model": a high-level, often qualitative, representation of the system (schematic)
 		!!! warning "Warning"
-		    Always Explicitly list the assumptions made to simplify the model!
+		    Always explicitly list the assumptions made to simplify the model!
 		"""
 	system = PlutoUI.details("System analysis & conceptual modeling", system_analysis_content, open=false)
 	
@@ -90,19 +90,19 @@ begin
 		!!! tip "Verification "
 			*Did we build the model right?*
 
-		    This can included testing with simple/known inputs where the output can be manually calculated or analytically derived. 
+		    This can include testing with simple/known inputs where the output can be manually calculated or analytically derived. 
 
-			``\Rightarrow`` this ensure the computer code accurately implements the formal model description.
+			``\Rightarrow`` this ensures the computer code accurately implements the formal model description.
 
 		!!! tip "Validation "
 			*Did we build the right model?*
 
-		    This can included:
+		    This can include:
 			* comparing model output against real-world data, against analytical models or results from other validated simulations
 			* sensitivity analysis (does the model respond plausibly to parameter changes?), 
 			* involving subject matter experts (SMEs) to review model behavior and outputs (aka "face validation").
 
-			``\Rightarrow`` this assess whether the model's behavior and outputs are a reasonable representation of the real-world system for the intended purpose.
+			``\Rightarrow`` this assesses whether the model's behavior and outputs are a reasonable representation of the real-world system for the intended purpose.
 		
 		"""
 	formal_model = PlutoUI.details("Formal model development", formal_model_content, open=false)
@@ -141,11 +141,11 @@ end
 # ╔═╡ d0e8fe4b-8b76-4d95-9872-ba16d09ad217
 md"""
 ## Course overview
-The following topics will be adressed during this course:
+The following topics will be addressed during this course:
 * Introduction
 * Cellular automata
-* Physical modeling & self-organization
-* Networks (graphs) & Agent-based modeling
+* Physical modelling & self-organisation
+* Networks (graphs) & Agent-based modelling
 * Optimisation techniques
 * Monte Carlo Methods
 * Discrete Event Simulation (DES)
@@ -154,7 +154,7 @@ The following topics will be adressed during this course:
 * Project work (mid-November ``\rightarrow`` December)
 
 ## Evaluation
-* Test in Otober, 2Hr, date TBD.
+* Test in October, 2Hr, date TBD.
 * Exam: Individual project with oral defense that illustrates the complete M&S pipeline
 """
 
@@ -184,40 +184,42 @@ All notebooks can be found on [GitHub](https://github.com/B4rtDC/ES313). Additio
 # ╔═╡ e89bee34-39b8-4558-b7d5-6e9872e9ded4
 md"""
 ## Schedule (TBC)
+The schedule shown below is an indication. You should have your computer at any time.
 
 ### Theory
-- 03 Sep
+- 02 Sep
+- 04 Sep
 - 11 Sep
+- 16 Sep
 - 18 Sep
-- 02 Oct
-- 03 Oct => cancelled
-- 17 Oct
-- 24 Oct
-- 31 Oct
-- 06 Nov
+- 30 Sep
+- 07 Oct
+- 09 Oct
+- 04 Nov (assistant)
+- 06 Nov (assistant)
 
 
 ### Practice
-- 04 Sep
-- 12 Sep
-- 19 Sep
-- 25 Sep
-- 26 Sep
-- 10 Oct
-- 16 Oct
+- 23 Sep
+- 25 Sep (TBC if students available)
+- 02 Oct
+- 21 Oct
 - 23 Oct
+- 28 Oct
 - 30 Oct
-- 07 Nov
 - 13 Nov
-- 14 Nov
+
+### Blended learning / self study days
+- 14 Oct
+- 16 Oct
 
 
 ### Project timings
-
-- early November: list of projects available
-- no ex cathedra classes, but we are available during contact hours
-- 04+05 Dec: mandatory meeting: understanding of the problem
-- 18 + 19 Dec: mandatory meeting: progress
+- NLT early November: list of projects available
+- Starting Nov 18, course hours are scheduled for project work. During these periods, there are no ex cathedra classes, but we are available during contact hours (contact us beforehand)
+- 02 & 04 Dec: mandatory individual meeting - understanding of the problem
+- 16 & 18 Dec: mandatory individual meeting - progress evaluation
+- Jan: oral exam on the project work
 """
 
 # ╔═╡ cd6436f1-005a-495f-bc2b-fb519d0139dc

@@ -26,6 +26,7 @@ begin
 	using CSV, DataFrames
 	using ConcurrentSim
 	using Logging
+	using StatsBase: sample, Weights
 end
 
 # ╔═╡ 78afe080-f64f-4835-8f77-80ec906c2f13
@@ -40,6 +41,20 @@ html"""
 	}
 </style>
 """
+
+# ╔═╡ c9f01fb4-6a37-4f12-95f0-686f9f954f31
+begin
+	const COURSE_SEED = 161
+	RUN_EXPENSIVE_MONTE_CARLO = false
+	mc_rng(seed::Integer=COURSE_SEED) = MersenneTwister(seed)
+
+	function mean_ci(values; z=1.96)
+		n = length(values)
+		μ = mean(values)
+		se = n > 1 ? std(values) / sqrt(n) : 0.0
+		return (mean=μ, se=se, lower=μ - z * se, upper=μ + z * se)
+	end
+end
 
 # ╔═╡ dc08f693-5ebc-44e8-b4b2-48e48aeee5c9
 md"""# Monte Carlo methods"""
@@ -56,7 +71,21 @@ md"""
 	- There is no single 'Monte Carlo method'. Rather, the term describes a broad approach encompassing many specific techniques.
 	- The name "Monte Carlo" comes from the randomness akin to gambling, inspired by the famous casino in Monaco.
 	- Historically, the [buffon's needle experiment](https://en.wikipedia.org/wiki/Buffon%27s_needle_problem) could be considered as the earliest Monte Carlo-style experiment.
-	- The first modern, computerised use [stems from the Manhattan Project](https://en.wikipedia.org/wiki/Monte_Carlo_method#History), where the Eniac computer was used to run a Monte Carlo simulation of neutron paths to determine the critical radius of a U-235 sphere.
+	- The first modern, computerised use [stems from the Manhattan Project](https://en.wikipedia.org/wiki/Monte_Carlo_method#History), where the ENIAC computer was used to run Monte Carlo simulations of neutron paths.
+"""
+
+# ╔═╡ 439f0f9f-bb4d-4f28-855f-2d20c5207e09
+md"""
+!!! warning "Monte Carlo estimates are random variables"
+	A Monte Carlo result should almost never be reported as one number only. If
+	```math
+	\hat{\mu}_N = \frac{1}{N}\sum_{i=1}^{N} f(X_i),
+	```
+	then the law of large numbers tells us that ``\hat{\mu}_N`` converges to the true expected value, while the central limit theorem tells us that its standard error shrinks like
+	```math
+	\mathrm{SE}(\hat{\mu}_N) \approx \frac{s}{\sqrt{N}}.
+	```
+	This slow ``1/\sqrt{N}`` convergence is the central trade-off of Monte Carlo: it is flexible and dimension-friendly, but halving the error generally requires four times as many samples.
 """
 
 # ╔═╡ 2d78885b-1673-4c75-a5c9-8ca7b4b9237e
@@ -74,16 +103,16 @@ Monte Carlo methods are often used to approximate an unknown "true" model `` f(x
 # ╔═╡ f2445950-a23b-4e98-b72a-37c28f0e894c
 begin
 	"""
-		buffon_needle(n_drops, line_distance, needle_length)
+		buffon_needle(rng, n_drops, line_distance, needle_length)
 
 	Recreation of buffon's needle experiments for the case where needle_length ≤ line_distance
 	"""
-	function buffon_needle(n_drops, line_distance, needle_length)
+	function buffon_needle(rng::AbstractRNG, n_drops, line_distance, needle_length)
 	    hits = 0
 	    for _ in 1:n_drops
 	        # Random center position and angle
-	        x = rand() * line_distance
-	        theta = rand() * π
+	        x = rand(rng) * line_distance
+	        theta = rand(rng) * π
 	        # Check if needle crosses a line
 	        if x <= (needle_length / 2) * sin(theta) || x >= line_distance - (needle_length / 2) * sin(theta)
 	            hits += 1
@@ -96,21 +125,24 @@ begin
 	        return (2 * needle_length * n_drops) / (hits * line_distance)
 	    end
 	end
+	buffon_needle(n_drops, line_distance, needle_length) = buffon_needle(Random.default_rng(), n_drops, line_distance, needle_length)
 
 	let
+		rng = mc_rng(101)
 		# Parameters
 		n_drops = 100000
 		line_distance = 1.0
 		needle_length = 1.0
 	
 		 # Run simulation
-		estimated_pi = buffon_needle(n_drops, line_distance, needle_length)
+		estimated_pi = buffon_needle(rng, n_drops, line_distance, needle_length)
 		println("Estimated π: ", estimated_pi)
 	end
 end
 
 # ╔═╡ 40908b8a-6ed8-4442-b8bd-34c058b16de7
 let
+	rng = mc_rng(102)
 	# Make an illustration for multiple samples
 	N_s = 100
 	line_distance = 1.0
@@ -119,7 +151,7 @@ let
 	for n_drops in 10 .^ (1:4)
 		π_estimates = Float64[]
 		for n in 1:N_s
-			push!(π_estimates, buffon_needle(n_drops, line_distance, needle_length))
+			push!(π_estimates, buffon_needle(rng, n_drops, line_distance, needle_length))
 		end
 		violin!(p, π_estimates)
 	end
@@ -131,11 +163,39 @@ end
 
 # ╔═╡ 0a7d94b3-1485-4377-9b49-20e79fdb3d4b
 md"""
-Another way of estimating $\pi$ is dropping point in a square, and analyse the number of points that fall within the inscribed circle.
+Another way of estimating $\pi$ is dropping points in a square, and analysing the number of points that fall within the inscribed circle.
 """
 
 # ╔═╡ 91c493a7-a4bc-4284-956e-86567dc100d4
-# try this
+let
+	function circle_pi(rng::AbstractRNG, n_points::Int)
+		inside = 0
+		for _ in 1:n_points
+			x = 2rand(rng) - 1
+			y = 2rand(rng) - 1
+			inside += x^2 + y^2 <= 1
+		end
+		p̂ = inside / n_points
+		π̂ = 4p̂
+		se = 4sqrt(p̂ * (1 - p̂) / n_points)
+		return (estimate=π̂, se=se, lower=π̂ - 1.96se, upper=π̂ + 1.96se)
+	end
+
+	sample_sizes = 10 .^ (2:5)
+	results = [circle_pi(mc_rng(200 + i), n) for (i, n) in enumerate(sample_sizes)]
+	estimates = [r.estimate for r in results]
+	lower_ribbon = estimates .- [r.lower for r in results]
+	upper_ribbon = [r.upper for r in results] .- estimates
+
+	plot(sample_sizes, estimates; 
+		xscale=:log10,
+		ribbon=(lower_ribbon, upper_ribbon),
+		label="Monte Carlo estimate",
+		xlabel="number of points",
+		ylabel=L"\hat{\pi}",
+		legend=:bottomright)
+	hline!([π]; label=L"\pi", color=:black, linestyle=:dash)
+end
 
 # ╔═╡ 5496024e-7376-420d-b13c-e157c574553e
 md"""
@@ -156,29 +216,32 @@ c \approx \frac{1}{M} \sum_{i=1}^{M}f(𝐱_i)
 
 # ╔═╡ 769c8fe3-9162-4cc9-82c5-3ce7a2c4805f
 let
-	function monte_carlo_integral(n_samples)
-	    sum = 0.0
-	    for _ in 1:n_samples
-	        x = rand()  # Sample x uniformly from [0,1]
-	        sum += x^2
+	function monte_carlo_integral(rng::AbstractRNG, n_samples)
+	    values = Vector{Float64}(undef, n_samples)
+	    for i in eachindex(values)
+	        x = rand(rng)  # Sample x uniformly from [0,1]
+	        values[i] = x^2
 	    end
-	    return sum / n_samples
+	    return mean_ci(values)
 	end
 
 	# Run simulation
+	rng = mc_rng(301)
 	n_samples = 100000
-	estimated_integral = monte_carlo_integral(n_samples)
-	println("Estimated integral of x^2 from 0 to 1: ", estimated_integral)
+	result = monte_carlo_integral(rng, n_samples)
+	println("Estimated integral of x^2 from 0 to 1: ", result.mean)
+	println("95% confidence interval: [", result.lower, ", ", result.upper, "]")
+	println("Exact value: ", 1/3)
 end
 
 # ╔═╡ 4c7434d6-2e5b-4c45-af15-649b65caa875
 md"""
-**Note:** an additional advantage of this approach, is that the different realisations can be computed independent from one another, so for more compute-intensive tasks, you can benefit from parallel computing for massive speep-ups.
+**Note:** an additional advantage of this approach is that the different realisations can be computed independently from one another, so for more compute-intensive tasks, you can benefit from parallel computing for large speed-ups.
 """
 
 # ╔═╡ 6e1d9ce1-d90b-4b9b-9e8e-9f474535c868
 md"""
-### Optimisation and bayesian inference
+### Optimisation and Bayesian inference
 !!! info "Bayesian inference"
 	Bayesian inference is a method of statistical inference where you update your beliefs (probability distributions) about uncertain parameters based on observed data. It is grounded in Bayes' theorem, which combines a prior, a likelihood, and a posterior (cf. probability and statistics courses). Formally:
 	```math
@@ -209,7 +272,7 @@ However, the MLE gives you one number with no sense of how certain or uncertain 
 """
 
 prior_content = md"""
-We need to establish our prior, i.e. what we think $\lambda$ might be before looking at the data. To keep things simple, we could simply estimate is to be any number between 0 and 10, all equaly likely (i.e. a uniform distribution). So we have the following prior:
+We need to establish our prior, i.e. what we think $\lambda$ might be before looking at the data. To keep things simple, we could assume it to be any number between 0 and 10, all equally likely (i.e. a uniform distribution). So we have the following prior:
 ```math
 P(\lambda) = \begin{cases} \frac{1}{10} & \lambda \in [0, 10] \\ 0 & \text{elsewhere} \end{cases}
 ```
@@ -219,13 +282,13 @@ prior = PlutoUI.details("Prior", [prior_content], open=false)
 likelihood_content = md"""
 We can determine the likelihood of our data based on its assumed model (Poisson) and the parameter: 
 ```math
-P(D | \lambda) = \prod_{i=1}^{N} \frac{\lambda^x_i e^{-\lambda}}{x_i!}
+P(D | \lambda) = \prod_{i=1}^{N} \frac{\lambda^{x_i} e^{-\lambda}}{x_i!}
 ```
 """
 likelihood = PlutoUI.details("Likelihood", [likelihood_content], open=false)
 
 posterior_content = md"""
-We can determine the likelihood of our data based on its assumed model (Poisson) and the parameter: 
+We combine the likelihood with the prior to obtain the posterior, up to the normalising constant $P(D)$:
 ```math
 P(\lambda | D ) \propto P(\text{data} | \lambda)  P(\lambda)
 ```
@@ -247,7 +310,7 @@ MH_principle_content = md"""
 	- Suggest a point by tweaking the current one a little (e.g $\lambda_{\text{new}} = 5.0 + \varepsilon$)
 	- If the new point is outside our prior range, reject it right away as it is impossible based on our initial belief (e.g. less than 0 or more than 10)
 	- Calculate how likely the data is with the current point (e.g. $\lambda = 5.0$) and the new point (e.g. $\lambda = 5.2$). If the new one makes the data more likely, move there. If not, you might still move, but with a probability based on how much less likely it is.
-	- Movement is base on the ratio: $r = \frac{P(D | \lambda_{\text{new}})}{P(D | \lambda_{\text{current}})}$.If $r \geq 1$, accept $\lambda_{\text{new}}$. If $r < 1$, accept it with probability $r$ (e.g., if $r = 0.8$, accept 80% of the time). Roll a random number between 0 and 1 to decide.
+	- Movement is based on the ratio: $r = \frac{P(D | \lambda_{\text{new}})}{P(D | \lambda_{\text{current}})}$. If $r \geq 1$, accept $\lambda_{\text{new}}$. If $r < 1$, accept it with probability $r$ (e.g., if $r = 0.8$, accept 80% of the time). Roll a random number between 0 and 1 to decide.
 
 	This process is repeated for a large number of iterations. You might also want to discard the first samples, because you started in a random spot, which may bias the results. I.e. we throw out the "warm-up" measures.
 """
@@ -268,43 +331,55 @@ let
 	    # Log of Poisson likelihood: sum(x_i * log(lambda)) - n * lambda
 	    return sum_x * log(lambda) - n * lambda
 	end
+
+	function log_posterior(lambda, data)
+		0 < lambda < 10 || return -Inf
+		return log_likelihood(lambda, data) # uniform prior contributes only a constant on [0, 10]
+	end
 	
 	# Metropolis-Hastings algorithm to sample lambda values
-	function metropolis_hastings(data, num_iterations, sigma)
+	function metropolis_hastings(rng::AbstractRNG, data, num_iterations, sigma)
 	    lambda_current = 5.0  # Start with a guess of 5 emails per day
-	    samples = Float64[]   # Empty list to store our samples
+	    samples = Vector{Float64}(undef, num_iterations)
+		accepted = 0
 	    for t in 1:num_iterations
 	        # Propose a new lambda by adding a random tweak
-	        lambda_proposed = lambda_current + randn() * sigma
-	        # Check if the proposed lambda fits our prior (0 to 10)
-	        if lambda_proposed < 0 || lambda_proposed > 10
-	            r = 0.0  # Reject if outside the range
-	        else
-	            # Calculate the acceptance ratio using log-likelihoods
-	            log_r = log_likelihood(lambda_proposed, data) - log_likelihood(lambda_current, data)
-	            r = exp(log_r)  # Convert back from log to regular scale
-	        end
+	        lambda_proposed = lambda_current + randn(rng) * sigma
+	        # Calculate the acceptance ratio using log-posterior values
+	        log_r = log_posterior(lambda_proposed, data) - log_posterior(lambda_current, data)
 	        # Accept the new lambda with probability r
-	        if rand() < r
+	        if log(rand(rng)) < min(0, log_r)
 	            lambda_current = lambda_proposed  # Move to the new lambda
+				accepted += 1
 	        end
-	        push!(samples, lambda_current)  # Save the current lambda
+	        samples[t] = lambda_current  # Save the current lambda
 	    end
-	    return samples
+	    return (samples=samples, acceptance_rate=accepted / num_iterations)
 	end
-	Random.seed!(161)  # Make results repeatable
+
+	function lag_autocorrelation(values, max_lag)
+		centered = values .- mean(values)
+		denominator = sum(abs2, centered)
+		denominator == 0 && return zeros(max_lag)
+		return [
+			sum(centered[1:end-lag] .* centered[1+lag:end]) / denominator
+			for lag in 1:max_lag
+		]
+	end
 	
 	# Our data
 	data = [3, 5, 2, 7, 4]
 	#data = rand(Poisson(4.5), 100)
 	
 	# Settings for the algorithm
-	num_iterations = 100000 
+	rng = mc_rng(401)
+	num_iterations = 40000 
 	burn_in = 1000         # Ignore the first 1,000 samples
 	sigma = 1.0            # How big the random tweaks are
 	
 	# Run the algorithm
-	samples = metropolis_hastings(data, num_iterations, sigma)
+	chain = metropolis_hastings(rng, data, num_iterations, sigma)
+	samples = chain.samples
 	
 	# Keep only the samples after burn-in
 	posterior_samples = samples[burn_in+1:end]
@@ -318,18 +393,33 @@ let
 	println("Posterior mean of λ: ", round(posterior_mean, digits=2))
 	println("95% credible interval: [", round(credible_interval[1], digits=2), ", ", round(credible_interval[2], digits=2), "]")
 	println("MLE estimator (sample mean): ", mle)
+	println("Acceptance rate: ", round(chain.acceptance_rate, digits=2))
 
 	# Plot results
-	histogram(posterior_samples, label="sample posterior", normalize=true)
+	p1 = histogram(posterior_samples, label="sample posterior", normalize=true, xlabel=L"\lambda", ylabel="density")
 	x = range(minimum(posterior_samples), maximum(posterior_samples), length=100)
 	α = (sum(data)+1)
-	β = 1/length(data)
-	plot!(x, pdf.(Gamma(α, β), x), label="Γ distribution")
+	θ = 1 / length(data) # Distributions.jl uses shape-scale parameterisation
+	plot!(p1, x, pdf.(Gamma(α, θ), x), label="Gamma approximation")
+
+	p2 = plot(samples[1:1000], label="", xlabel="iteration", ylabel=L"\lambda", title="Trace")
+	p3 = bar(1:30, lag_autocorrelation(posterior_samples, 30), label="", xlabel="lag", ylabel="autocorrelation", title="Dependence")
+	plot(p1, p2, p3, layout=(1,3), size=(1050, 300), bottom_margin=4mm)
 end
+
+# ╔═╡ da0ccdb7-b5d9-490b-a52d-4e0a43a96f26
+md"""
+!!! note "Why check autocorrelation?"
+	In ordinary Monte Carlo, we usually assume that the samples are independent. In Markov Chain Monte Carlo this is no longer true: every proposed value is generated from the current value, so neighbouring samples can be strongly related.
+
+	The `lag_autocorrelation` helper measures how much the chain still resembles itself after 1, 2, 3, ... steps. If autocorrelation drops quickly, the chain is mixing well and the posterior sample contains many effectively different values. If autocorrelation remains high for many lags, the chain moves slowly through the posterior: the histogram may still look reasonable, but the effective number of independent samples is much smaller than the raw number of iterations.
+
+	This is why the diagnostic plot contains three views: the histogram shows the posterior shape, the trace plot shows whether the chain explores the posterior over time, and the autocorrelation plot shows how dependent the samples are. High dependence suggests running longer, changing the proposal size `sigma`, or using a better sampler.
+"""
 
 # ╔═╡ a783183d-50dd-4c7c-80ba-65c9d858682c
 md"""
-**Note:** notice how we do not exactly obtain the same values for the point estimator. This is expected behavior, and results from the choice of the prior. It can be shown that our posterior approximatively follows a gamma distribution with parameters $\alpha=22$ and $\beta=5$, which leads to a theoretical value of $4.4$. For larger sample sizes the MLE and Bayesian point estimate of the parameter would converge.
+**Note:** notice how we do not exactly obtain the same values for the point estimator. This is expected behavior, and results from the choice of the prior. Ignoring the upper truncation at 10, this posterior approximately follows a Gamma distribution with shape $\alpha=22$ and rate $\beta=5$, which has mean $\alpha/\beta=4.4$. In `Distributions.jl` this is written as `Gamma(22, 1/5)`, because the second parameter is the scale. For larger sample sizes the MLE and Bayesian point estimate of the parameter would converge.
 """
 
 # ╔═╡ 4b81af14-bc99-475b-a52b-f1aaa1e60a1e
@@ -360,6 +450,7 @@ The variance however is given by $Var (I) = Var(f(X))/N$, so if we want to reduc
 
 # ╔═╡ ab9e17e5-9d3d-4790-924b-9de1ff8d55c2
 begin
+	rng = mc_rng(501)
 	# function
 	f(x) = exp.(x)
 	
@@ -370,7 +461,7 @@ begin
 	for n in sample_lengths
 		I_est = Vector{Float64}(undef, n_var)
 		for i in 1:n_var
-			S = f(rand(n))
+			S = f(rand(rng, n))
 			I_est[i] = sum(S)/n
 		end
 		push!(var_est, var(I_est))
@@ -410,7 +501,7 @@ Note that if $U \sim U(0,1)$, then $1-U \sim U(0,1)$. Therefore, $X_{i1}$ and $X
 md"""
 ### Stratification
 !!! info "Principle"
-	The domain is divided in $K$ disjoint subintervals ('strata', often of equal width). We then drawn a predetermined number of samples from each stratum (often $N/K$). The estimator is the average of the values over the stratified samples. By being more systematic in the data points, this approach leads to a variance reduction.
+	The domain is divided in $K$ disjoint subintervals ('strata', often of equal width). We then draw a predetermined number of samples from each stratum (often $N/K$). The estimator is the average of the values over the stratified samples. By being more systematic in the data points, this approach leads to a variance reduction.
 """
 
 # ╔═╡ 03457e65-1f4f-4ab8-9d56-a31d738ea633
@@ -464,9 +555,9 @@ md"""
 	x^2/2 + x/2 = U \rightarrow X = (-1 \pm \sqrt{1 + 8U}) / 2. 
 	```
     
-	However, we can only have values of $X$ in the interval $[0,1]$, so we take the positive root: $X = (-1 \pm \sqrt{1 + 8U}) / 2$.
+	However, we can only have values of $X$ in the interval $[0,1]$, so we take the positive root: $X = (-1 + \sqrt{1 + 8U}) / 2$.
 
-	If we check the boundaries: $U=0\rightarrow X=0$, $U=0\rightarrow X=1$. This function is never zero-values in the relevant domain, which in principle makes it a better candidate.
+	If we check the boundaries: $U=0\rightarrow X=0$, $U=1\rightarrow X=1$. This function is never zero-valued in the relevant domain, which in principle makes it a better candidate.
 """
 
 # ╔═╡ b11f2c5f-63f8-40bd-a90c-3598380860b4
@@ -474,6 +565,7 @@ md"""## Illustration"""
 
 # ╔═╡ 0d8f3619-5af4-45f3-b358-636a655ce4a7
 let
+	rng = mc_rng(502)
 	# function
 	f(x) = exp.(x)
 	
@@ -485,7 +577,7 @@ let
 	for n in sample_lengths
 		I_est = Vector{Float64}(undef, n_var)
 		for i in 1:n_var
-			S = f(rand(n))
+			S = f(rand(rng, n))
 			I_est[i] = sum(S)/n
 		end
 		push!(var_est, var(I_est))
@@ -497,7 +589,7 @@ let
 		I_est_a = Vector{Float64}(undef, n_var)
 		n_av = n ÷ 2 # only require half
 		for i in 1:n_var
-			U_primary = rand(n_av)          # generate u_1, ..., u_{n/2}
+			U_primary = rand(rng, n_av)          # generate u_1, ..., u_{n/2}
 			U_antithetic = 1.0 .- U_primary # generate 1-u_1, ..., 1-u_{n/2}
 			S_primary = f(U_primary)
             S_antithetic = f(U_antithetic)
@@ -511,13 +603,13 @@ let
 	K_strata = 10
 	for n in sample_lengths
 		I_est_s = Vector{Float64}(undef, n_var)
-		n_s = n ÷ K_strata # number of measure per stratum to have save global number
+		n_s = n ÷ K_strata # number of samples per stratum to keep the same global budget
 		for i in 1:n_var
 			# accumulator
 			acc = 0.
 			# inner stratum loop
 			for k = 0:K_strata-1
-				u = rand(n_s)
+				u = rand(rng, n_s)
 				x = (k .+ u) ./ K_strata
 				acc += sum(f(x))
 			end
@@ -534,15 +626,15 @@ let
 	for n in sample_lengths
 		I_est_is = Vector{Float64}(undef, n_var)
 		for i in 1:n_var
-			# determin U
-			U_for_IS = rand(n)
-			# determin X
+			# determine U
+			U_for_IS = rand(rng, n)
+			# determine X
 			X_is = (-1.0 .+ sqrt.(1.0 .+ 8.0 .* U_for_IS)) ./ 2.0
 			# sampling + q compute
 			S_is = f.(X_is)
 			Q_is = q(X_is)
 			# weight computation
-			w = 1.0 ./ Q_is # note that p(x) = 1 in our case (uniform samling in [0,1])
+			w = 1.0 ./ Q_is # note that p(x) = 1 in our case (uniform sampling in [0,1])
 			# actual estimates
 			I_est_is[i] = sum(S_is .* w) / n
 		end
@@ -559,11 +651,69 @@ let
 	title!("Comparison")
 end
 
+# ╔═╡ bcb15c89-7602-4116-84cb-595c2e648b89
+md"""
+!!! tip "Estimator efficiency"
+	Variance reduction is useful only if the lower variance is worth the extra work. A practical comparison is therefore based on equal simulation budgets and looks at the empirical variance of repeated estimates. The rough efficiency gain below compares each method to plain Monte Carlo for the same nominal number of function evaluations.
+"""
+
+# ╔═╡ f248de45-d152-43dc-a2ee-70f49b22b844
+let
+	rng = mc_rng(503)
+	f(x) = exp.(x)
+	q(x) = x + 0.5
+	n = 1000
+	repetitions = 1000
+	K = 10
+
+	function estimate_standard(rng)
+		mean(f.(rand(rng, n)))
+	end
+
+	function estimate_antithetic(rng)
+		u = rand(rng, n ÷ 2)
+		mean(vcat(f.(u), f.(1 .- u)))
+	end
+
+	function estimate_stratified(rng)
+		n_per_stratum = n ÷ K
+		acc = 0.0
+		for k in 0:K-1
+			x = (k .+ rand(rng, n_per_stratum)) ./ K
+			acc += sum(f.(x))
+		end
+		acc / (n_per_stratum * K)
+	end
+
+	function estimate_importance(rng)
+		u = rand(rng, n)
+		x = (-1.0 .+ sqrt.(1.0 .+ 8.0 .* u)) ./ 2.0
+		mean(f.(x) ./ q.(x))
+	end
+
+	estimators = [
+		("Standard MC", estimate_standard),
+		("Antithetic", estimate_antithetic),
+		("Stratified", estimate_stratified),
+		("Importance sampling", estimate_importance),
+	]
+	estimates = Dict(name => [estimator(rng) for _ in 1:repetitions] for (name, estimator) in estimators)
+	variances = Dict(name => var(values) for (name, values) in estimates)
+	reference_variance = variances["Standard MC"]
+
+	DataFrame(
+		method=[name for (name, _) in estimators],
+		mean_estimate=[round(mean(estimates[name]), digits=5) for (name, _) in estimators],
+		variance=[round(variances[name], sigdigits=4) for (name, _) in estimators],
+		efficiency_gain=[round(reference_variance / variances[name], digits=2) for (name, _) in estimators],
+	)
+end
+
 # ╔═╡ 708ffc5b-83b6-48b2-a0d1-bdabd970ee9a
 md"""
-# Application
+# Applications
 ## Global clustering coefficient
-In the one of the previous lectures, we discussed graphs. The clustering coefficient is a measure of the degree to which nodes in a graph tend to cluster together (i.e. form triangles)
+In the Networks and graphs lecture (03), we discussed graphs. The clustering coefficient is a measure of the degree to which nodes in a graph tend to cluster together (i.e. form triangles)
 
 !!! info "Global clustering coefficient"
 	Given a graph $G(V,E)$ with nodes $v_i$ and edges $e_{ij}$, the global clustering coefficient $C$ is defined as:
@@ -574,215 +724,181 @@ In the one of the previous lectures, we discussed graphs. The clustering coeffic
 	For large, and dense graphs, computing the exact value can be very expensive, which is why we will resort to a Monte Carlo approach
 
 ### Standard Monte Carlo
-For a standard approach, we would simply select a random triplet $(u,v,w)$ (in which the edges $e_{uv}$, and $e_{vw}$ exist), and evaluate if $e_{uw}$ also exists.
+For a standard approach, we would simply select a random triplet $(u,v,w)$ (in which the edges $e_{uv}$, and $e_{vw}$ exist), and evaluate if $e_{uw}$ also exists. **Note:** the implementation below picks the centre node $v$ uniformly at random, so every node counts equally rather than in proportion to the number of wedges it forms. This makes the estimator converge to the *mean local* clustering coefficient, not the *global* one, so its relative error settles at a nonzero floor as $N$ grows. The stratified estimator corrects this by weighting nodes by their wedge count. (Alternatively, fix the code so `random_triplet` samples the centre proportionally to `wedge_count(degree)`, making both estimators unbiased and reducing the comparison to pure variance reduction.)
 
 
 ### Stratified 
+The probability that a sampled wedge is closed can vary strongly with the degree of the centre node. In a scale-free graph, many nodes have small degree and a few nodes have very large degree. We can therefore stratify by degree, estimate the closure probability inside each degree band, and combine those estimates using the number of possible wedges in each band as weights.
+
+This weighting matters: if we choose a centre node uniformly, high-degree nodes are underrepresented relative to the number of wedges they create. For the global clustering coefficient, the sampling unit is the wedge, not the node.
 """
 
 # ╔═╡ a0db54fa-9ee7-40dd-92f6-f29265f83c63
 begin
-	# helper function to generate a random triplet, returns node ids
-	function random_triplet(G)
-		v = rand(1:nv(G))
-		nbrs   = neighbors(G, v)
-	    if length(nbrs) < 2
-	        return random_triplet(G)             # retry
-	    end
-	    u, w   = sample(nbrs, 2; replace=false)
-	    return (u, v, w)
+	wedge_count(d::Integer) = d < 2 ? 0.0 : d * (d - 1) / 2
+
+	function sample_two_neighbors(rng::AbstractRNG, nbrs)
+		length(nbrs) >= 2 || throw(ArgumentError("Need at least two neighbours to sample a wedge."))
+		i = rand(rng, 1:length(nbrs))
+		j = rand(rng, 1:length(nbrs)-1)
+		j >= i && (j += 1)
+		return nbrs[i], nbrs[j]
 	end
 
-	# helper function to evaluate the edge existance
+	function wedge_centers(G)
+		centers = [v for v in vertices(G) if degree(G, v) >= 2]
+		isempty(centers) && throw(ArgumentError("This graph has no wedges, so the global clustering coefficient is undefined/zero."))
+		return centers
+	end
+
+	# helper function to generate a random triplet, returns node ids
+	function random_triplet(rng::AbstractRNG, G, centers=wedge_centers(G))
+		v = rand(rng, centers)
+		u, w = sample_two_neighbors(rng, neighbors(G, v))
+		return (u, v, w)
+	end
+	random_triplet(G) = random_triplet(Random.default_rng(), G)
+
+	# helper function to evaluate the edge existence
 	is_closed(G, u, w) = has_edge(G, u, w) ? 1 : 0
 
 	# Standard Monte Carlo
-	function MC_clustering(G, N)
+	function MC_clustering(rng::AbstractRNG, G, N)
+		N <= 0 && return 0.0
+		centers = wedge_centers(G)
 		closed = 0
 		for _ in 1:N
-        	u,v,w = random_triplet(G)
+        	u,v,w = random_triplet(rng, G, centers)
         	closed += is_closed(G, u, w)
     	end
 	    
 		return closed / N
 	end
+	MC_clustering(G, N) = MC_clustering(Random.default_rng(), G, N)
 
 	# Stratified Monte Carlo (strata based on degree of center node v)
-    function MC_clustering_strata(G::AbstractGraph, N::Int, K::Int)
+    function MC_clustering_strata(rng::AbstractRNG, G::AbstractGraph, N::Int, K::Int)
         if nv(G) == 0 return 0.0 end
         if K <= 0 throw(ArgumentError("K must be positive.")) end
         if N <= 0 return 0.0 end
 
-        # get degree vector
-        d = degree(G)
-
-        # 1. Create Strata Mapping (nodes per stratum)
-        # Strata are defined by the degree of the center node 'v' of a wedge
-        strata_nodes_map = Dict(i => Vector{Int}() for i in 1:K)
-        min_deg_val = minimum(d for d in d if d >=2; init=2) # Min degree that can form a wedge
-        max_deg_val = maximum(d; init=2)
-
-        # Handle case where all nodes have degree < 2 or max_deg_val == min_deg_val
-        if max_deg_val <= min_deg_val || max_deg_val < 2
-             # Effectively one stratum, or no valid wedges possible.
-             # Fallback to global sampling if stratification isn't meaningful here.
-             # Or, if all nodes have deg < 2, clustering coeff is 0.
-             for v_node in vertices(G)
-                if d[v_node] >= 2 # Only consider nodes that can be centers of wedges
-                    push!(strata_nodes_map[1], v_node)
-                end
-             end
-             # If strata_nodes_map[1] is empty, means no node can center a wedge
-             if isempty(strata_nodes_map[1]) return 0.0 end
-
-             # Set K_num_strata to 1 for the rest of the logic if it was >1
-             K_num_strata = 1 
-        else
-            for v_node in vertices(G)
-                deg_v = d[v_node]
-                if deg_v < 2 continue end # This node cannot be the center of a wedge
-
-                # Map degree to stratum index (1 to K)
-                # fld: floor division
-                stratum_idx = clamp(fld((deg_v - min_deg_val) * K, (max_deg_val - min_deg_val + eps(Float64))) + 1, 1, K)
-                push!(strata_nodes_map[stratum_idx], v_node)
-            end
-        end
-
-
-        # 2. Calculate Stratum Weights (W_j)
-        # W_j = (sum of potential wedges centered in stratum_j) / (total potential wedges in G)
+        degrees = degree(G)
+		node_wedges = [wedge_count(degrees[v]) for v in vertices(G)]
         stratum_weights = zeros(Float64, K)
-        total_potential_wedges_in_G = 0.0
+        strata_nodes = [Int[] for _ in 1:K]
+		strata_node_weights = [Float64[] for _ in 1:K]
+        total_wedges = sum(node_wedges)
 
-        for v_node in vertices(G)
-            deg_v = d[v_node]
-            if deg_v >= 2
-                total_potential_wedges_in_G += deg_v * (deg_v - 1) / 2.0
-            end
-        end
+		total_wedges == 0.0 && return 0.0
 
-        if total_potential_wedges_in_G == 0.0
-            return 0.0 # No wedges in the graph, so clustering coeff is 0
-        end
+		valid_degrees = [degrees[v] for v in vertices(G) if node_wedges[v] > 0]
+		min_deg_val, max_deg_val = extrema(valid_degrees)
 
-        for j in 1:K
-            potential_wedges_in_stratum_j = 0.0
-            for v_node_in_stratum in strata_nodes_map[j]
-                deg_v = d[v_node_in_stratum]
-                # degree must be >= 2 as per strata_nodes_map construction
-                potential_wedges_in_stratum_j += deg_v * (deg_v - 1) / 2.0
-            end
-            if total_potential_wedges_in_G > 0 # Avoid division by zero
-                stratum_weights[j] = potential_wedges_in_stratum_j / total_potential_wedges_in_G
-            else
-                stratum_weights[j] = 0.0
-            end
-        end
+		for v_node in vertices(G)
+			node_wedges[v_node] == 0 && continue
+			deg_v = degrees[v_node]
+			stratum_idx = min_deg_val == max_deg_val ? 1 : clamp(
+				floor(Int, (deg_v - min_deg_val) * K / (max_deg_val - min_deg_val + eps(Float64))) + 1,
+				1,
+				K,
+			)
+			push!(strata_nodes[stratum_idx], v_node)
+			push!(strata_node_weights[stratum_idx], node_wedges[v_node])
+			stratum_weights[stratum_idx] += node_wedges[v_node]
+		end
+
+		stratum_weights ./= total_wedges
 
         # 3. Estimate p_j for each stratum and combine
         overall_weighted_closed_proportion = 0.0 # This will be our C_stratified
 
         # Allocate N proportionally to W_j
-        samples_per_stratum_target = [round(Int, N * stratum_weights[j]) for j in 1:K]
-        
-        # Adjust samples if sum isn't N due to rounding
-        # A simple way: add/subtract difference from the largest stratum or distribute
-        current_sum_samples = sum(samples_per_stratum_target)
-        diff_samples = N - current_sum_samples
-        if diff_samples != 0 && K > 0
-            # Distribute diff among strata (e.g., add to first few, or those with most weight)
-            # For simplicity, add to strata with non-zero weights until diff is 0
-            idx_adjust = 1
-            while diff_samples != 0 && idx_adjust <= K
-                if stratum_weights[idx_adjust] > 0 || samples_per_stratum_target[idx_adjust] > 0
-                    if diff_samples > 0
-                        samples_per_stratum_target[idx_adjust] += 1
-                        diff_samples -=1
-                    elseif diff_samples < 0 && samples_per_stratum_target[idx_adjust] > 0
-                        samples_per_stratum_target[idx_adjust] -= 1
-                        diff_samples +=1
-                    end
-                end
-                idx_adjust = (idx_adjust % K) + 1 # Cycle through strata
-            end
-        end
-
+		raw_counts = N .* stratum_weights
+        samples_per_stratum_target = floor.(Int, raw_counts)
+		remainder = N - sum(samples_per_stratum_target)
+		if remainder > 0
+			for j in sortperm(raw_counts .- samples_per_stratum_target, rev=true)
+				stratum_weights[j] == 0 && continue
+				samples_per_stratum_target[j] += 1
+				remainder -= 1
+				remainder == 0 && break
+			end
+		end
 
         for j in 1:K
-            if stratum_weights[j] == 0.0 || isempty(strata_nodes_map[j]) || samples_per_stratum_target[j] <= 0
+            if stratum_weights[j] == 0.0 || isempty(strata_nodes[j]) || samples_per_stratum_target[j] <= 0
                 # No contribution from this stratum if no weight, no nodes, or no samples allocated
                 continue
             end
 
             closed_in_stratum_j = 0
-            actual_wedges_sampled_in_stratum_j = 0
-            
             num_samples_for_this_stratum_j = samples_per_stratum_target[j]
+			center_weights = Weights(strata_node_weights[j])
 
             for _ in 1:num_samples_for_this_stratum_j
-                # Sample a center node 'v_center' from the nodes in stratum j
-                if isempty(strata_nodes_map[j]) break end # Should not happen if weight > 0
-                v_center = rand(strata_nodes_map[j])
-
-                nbrs_of_v = neighbors(G, v_center)
-                # degree(v_center) is guaranteed to be >= 2 by stratum construction
-                
-                u, w = sample(nbrs_of_v, 2, replace=false)
+                # Sample a center node proportional to the number of wedges it can form
+                v_center = sample(rng, strata_nodes[j], center_weights)
+                u, w = sample_two_neighbors(rng, neighbors(G, v_center))
 
                 closed_in_stratum_j += is_closed(G, u, w)
-                actual_wedges_sampled_in_stratum_j += 1
             end
 
-            p_j = 0.0 # Proportion of closed wedges for stratum j
-            if actual_wedges_sampled_in_stratum_j > 0
-                p_j = closed_in_stratum_j / actual_wedges_sampled_in_stratum_j
-            end
-
+            p_j = closed_in_stratum_j / num_samples_for_this_stratum_j # Proportion of closed wedges for stratum j
             overall_weighted_closed_proportion += stratum_weights[j] * p_j
         end
         
         return overall_weighted_closed_proportion
     end
+	MC_clustering_strata(G::AbstractGraph, N::Int, K::Int) = MC_clustering_strata(Random.default_rng(), G, N, K)
 end
 
 # ╔═╡ a39321e9-96f9-49e8-abb3-17fe4ab3a20e
 begin
-	# repeatability
-	Random.seed!(161)
-	
-	# generate graph
-	G = barabasi_albert(4000, 5)       # 4000 vertices, avg deg ≈ 8
+	# generate graph (seeded reproducibly via the Graphs.jl kwarg, never the global RNG)
+	graph_size = RUN_EXPENSIVE_MONTE_CARLO ? 4000 : 2000
+	G = barabasi_albert(graph_size, 5; seed=COURSE_SEED)       # Barabasi-Albert graph
 	# exact value
 	C_exact = global_clustering_coefficient(G) # Note: the denser the graph, the longer this computation takes, you can verify this by increasing the second parameter of the barabasi_albert function
 	
-	N_total = 1000
-	N_rep = 100
-	C_MC = [MC_clustering(G, N_total) for _ in 1:N_rep]
-	C_MC_S = [MC_clustering_strata(G, N_total, 20) for _ in 1:N_rep]
+	N_total = RUN_EXPENSIVE_MONTE_CARLO ? 1000 : 750
+	N_rep = RUN_EXPENSIVE_MONTE_CARLO ? 100 : 40
+	C_MC = [MC_clustering(mc_rng(6000 + i), G, N_total) for i in 1:N_rep]
+	C_MC_S = [MC_clustering_strata(mc_rng(7000 + i), G, N_total, 20) for i in 1:N_rep]
 
 	@info "Exact:\nC: $(round(C_exact, digits=5))"
 
 	rel_er_C_MC = abs( mean(C_MC) - C_exact)/ C_exact
-	@info "Standard M:\nC: $(round(mean(C_MC), digits=5)) (rel error: $(round(rel_er_C_MC, digits=4))), variance: $(var(C_MC))" 
+	C_MC_ci = mean_ci(C_MC)
+	@info "Standard MC:\nC: $(round(mean(C_MC), digits=5)) (rel error: $(round(rel_er_C_MC, digits=4))), 95% CI: [$(round(C_MC_ci.lower, digits=5)), $(round(C_MC_ci.upper, digits=5))], variance: $(var(C_MC))" 
 
 	rel_er_MC_S = abs( mean(C_MC_S) - C_exact)/ C_exact
-	@info "Standard M:\nC: $(round(mean(C_MC_S), digits=5)) (rel error: $(round(rel_er_MC_S, digits=4))), variance: $(var(C_MC_S))" 
+	C_MC_S_ci = mean_ci(C_MC_S)
+	@info "Stratified MC:\nC: $(round(mean(C_MC_S), digits=5)) (rel error: $(round(rel_er_MC_S, digits=4))), 95% CI: [$(round(C_MC_S_ci.lower, digits=5)), $(round(C_MC_S_ci.upper, digits=5))], variance: $(var(C_MC_S))" 
 end
 
 # ╔═╡ dcee775b-4283-4165-89db-b5fc87e0116c
 begin
-	# quick assessment of computational and memory cost
-	@btime global_clustering_coefficient(G)
-	@btime MC_clustering(G, N_total)   				# x108 speedup
-	@btime MC_clustering_strata(G, N_total, 20)		# x45  speedup (also x2 in terms of memory)
-	nothing
+	if RUN_EXPENSIVE_MONTE_CARLO
+		# quick assessment of computational and memory cost
+		suite = BenchmarkGroup()
+		suite["global_clustering_coefficient"] = @benchmarkable global_clustering_coefficient($G)
+		suite["MC_clustering"] = @benchmarkable MC_clustering(MersenneTwister(8001), $G, $N_total)
+		suite["MC_clustering_strata"] = @benchmarkable MC_clustering_strata(MersenneTwister(8002), $G, $N_total, 20)
+		tune!(suite)
+		run(suite)
+		suite
+	else
+		md"""
+		Benchmarks are skipped by default to keep the notebook responsive. Set `RUN_EXPENSIVE_MONTE_CARLO = true` near the top of the notebook to run the timing comparison.
+		"""
+	end
 end
 
 # ╔═╡ 4707b42d-8200-4ceb-a206-6b2e25e233ae
 begin
 	K_strata = 30
-	eval_Ns = 10 .^ (1:5)
+	eval_Ns = RUN_EXPENSIVE_MONTE_CARLO ? 10 .^ (1:5) : 10 .^ (1:3)
+	N_rep_eval = RUN_EXPENSIVE_MONTE_CARLO ? N_rep : 30
 	C_estimate_mc  = Vector{Float64}(undef, length(eval_Ns))
 	C_var_mc       = Vector{Float64}(undef, length(eval_Ns))
 	C_estimate_mcs = Vector{Float64}(undef, length(eval_Ns))
@@ -790,11 +906,11 @@ begin
 	
 	for (i, N_total) in enumerate(eval_Ns)
 		# Classical estimate
-		C_MC = [MC_clustering(G, N_total) for _ in 1:N_rep]
+		C_MC = [MC_clustering(mc_rng(8100 + 100 * i + rep), G, N_total) for rep in 1:N_rep_eval]
 		C_estimate_mc[i] = mean(C_MC)
 		C_var_mc[i] = var(C_MC)
 		# Strata-based estimate
-		C_MC_S = [MC_clustering_strata(G, N_total, K_strata) for _ in 1:N_rep]
+		C_MC_S = [MC_clustering_strata(mc_rng(9100 + 100 * i + rep), G, N_total, K_strata) for rep in 1:N_rep_eval]
 		C_estimate_mcs[i] = mean(C_MC_S)
 		C_var_mcs[i] = var(C_MC_S)
 	end
@@ -814,13 +930,13 @@ end
 
 # ╔═╡ 7b1be50c-9369-4ab6-8501-745f7f58080e
 md"""
-## Physics of the atomic bomb
+## Historical case study: neutron transport as a branching process
 ### Introduction
-One situation of great interest to Los Alamos in the 1940s, was the progress of free neutrons hurtling through a nuclear weapon as it began to explode. As Stanislaw Ulam, a mathematician who joined Los Alamos during the war and later helped to invent the hydrogenbomb, would subsequently note, “Most of the physics at Los Alamos could be reduced to the study of assemblies of particles interacting with each other, hitting each other, scattering, sometimes giving rise to new particles.”
+One historically important Monte Carlo problem was the motion of free neutrons through matter. Stanislaw Ulam, a mathematician who joined Los Alamos during the war and later contributed to early Monte Carlo work, described much of the physics there as the study of particles "interacting with each other" and sometimes producing new particles.
 
-Given the speed, direction, and position of a neutron and some physical constants, physicists could fairly easily compute the probability that it would, during the next tiny fraction of a second, crash into the nucleus of an unstable atom with sufficient force to break it up and release more neutrons in a process known as fission. One could also estimate the likelihood that neutron would fly out of the weapon entirely, change direction after a collision, or get stuck. But even in the very short time span of a nuclear explosion, these simple actions could be combined in an almost infinite number of sequences, defying even the brilliant physicists and mathematicians gathered at Los Alamos to simplify the proliferating chains of probabilities sufficiently to reach a traditional analytical solution.
+Given the speed, direction, and position of a neutron and some physical constants, one can compute probabilities for the next event: the neutron may leave the region, scatter, be absorbed, or produce additional neutrons through fission. These simple actions can be combined in an enormous number of event histories, making a traditional analytical solution difficult.
 
-The arrival of electronic computers offered an alternative: simulate the progress overtime of a series of virtual neutrons representing members of the population released by the bomb’s neutron initiator when a conventional explosive compressed its core to form a critical mass and trigger its detonation. Following these neutrons through thousands of random events would settle the question statistically, yielding a set of neutron histories that closely approximated the actual distribution implied by the parameters chosen. If the number of fissions increased over time, then a self-sustaining chain reaction was underway. The chain reaction would end after an instant as the core blew itself to pieces, so the rapid proliferation of free neutrons, measured by a parameter the weapon designers called “alpha,” was crucial to the bomb’s effectiveness in converting enriched uranium into destructive power.
+Electronic computers offered an alternative: simulate many virtual neutron histories and summarise the resulting population dynamics statistically. In this lecture we use the example as a toy neutron-transport model for Monte Carlo reasoning: event sampling, repeated replications, uncertainty, and branching processes. The model is deliberately simplified and should be read as a numerical-methods case study, not as an engineering design model.
 
 ### Model building
 #### Neutron Reaction Rate Proportional to Neutron Flux and Target Area
@@ -854,9 +970,9 @@ Then
 
 Neutron flux can also be defined as ``\phi= n_nv_n`` where ``n_n`` is neutron density per cm3 in beam, ``v_n`` relative velocity (cm/s) of neutrons in beam.
 
-Cross section ``\sigma`` can be experimentally measured as function of energy: ``\sigma\left(E\right)``, expressed in “barns” (b) with 1b = 10e-24cm$^2$.
+Cross section ``\sigma`` can be experimentally measured as function of energy: ``\sigma\left(E\right)``, expressed in “barns” (b) with 1b = $10^{-24}$ cm$^2$.
 
-#### Neutron reaction cross sections
+#### Reaction types (scattering, absorption, fission)
 
 Cross sections ``\sigma\left(E\right)`` can be separated into different types of reactions – scattering, absorption, fission:
 ```math
@@ -926,6 +1042,17 @@ Distance traveled without interaction follows an exponential law with parameter 
 # ╔═╡ c502fa5f-d884-4dd8-ad0f-588fa5efa317
 begin
 	data = CSV.read("lectures/data/sigma_fission.txt", DataFrame)
+	function interpolate_cross_section_preview(data, energy)
+		energies = data[:, 1]
+		values = data[:, 2]
+		energy <= first(energies) && return first(values)
+		energy >= last(energies) && return last(values)
+		i = searchsortedfirst(energies, energy)
+		x1, x2 = energies[i-1], energies[i]
+		y1, y2 = values[i-1], values[i]
+		return y1 + (energy - x1) / (x2 - x1) * (y2 - y1)
+	end
+
 	const Nₐ = 6.02214086e23 # atoms / mole
 	const ρᵤ = 19.1          # g / cm3
 	const mᵤ = 235.0439299   # g / mole
@@ -934,11 +1061,9 @@ begin
 	const q = 1.60217662e-19
 	E = 300 * k / q # eV
 	@show E
-	i = findfirst(x -> x > E, data[:, 1])
-	σ300K = data[i, 2] + (E - data[i, 1]) / (data[i-1, 1] - data[i, 1]) * (data[i-1, 2] - data[i, 2])
+	σ300K = interpolate_cross_section_preview(data, E)
 	E = 2e6 # eV
-	i = findfirst(x -> x > E, data[:, 1])
-	σ2e6eV = data[i, 2] + (E - data[i, 1]) / (data[i-1, 1] - data[i, 1]) * (data[i-1, 2] - data[i, 2])
+	σ2e6eV = interpolate_cross_section_preview(data, E)
 	@show σ300K σ2e6eV # barn
 	Σ300K = nᵤ * σ300K * 1e-24
 	Σ2e6eV = nᵤ * σ2e6eV * 1e-24
@@ -1021,9 +1146,9 @@ The probability of a neutron (initial kinetic energy ``E_\textrm{in}``) collidin
 P\left\{E_\textrm{in}\rightarrow E_\textrm{out}\right\}=\frac{4\pi\displaystyle\frac{\mathrm d \sigma_s\left(\phi\right)}{\mathrm d \phi}}{\sigma_s E_\textrm{in}\left(1-\alpha\right)}
 ```
 
-The differential cross section can also is also available from [NNDC](http://www.nndc.bnl.gov/sigma/index.jsp), but we will suppose the scattering happens isotropically in a solid angle so ``\cos\phi`` is distributed uniformally in the interval ``\left[-1,1\right]`` and we use the previous formulas to calculate ``\psi`` and ``E_\textrm{out}``.
+The differential cross section is also available from [NNDC](http://www.nndc.bnl.gov/sigma/index.jsp), but we will suppose the scattering happens isotropically in a solid angle so ``\cos\phi`` is distributed uniformly in the interval ``\left[-1,1\right]`` and we use the previous formulas to calculate ``\psi`` and ``E_\textrm{out}``.
 
-The new ``\theta^\prime`` is uniformally distributed in the interval ``\left[\theta-\psi, \theta+\psi\right]``.
+The new ``\theta^\prime`` is uniformly distributed in the interval ``\left[\theta-\psi, \theta+\psi\right]``.
 
 #### Neutron Multiplication Factor
 
@@ -1031,7 +1156,7 @@ A numerical measure of a critical mass is dependent on the effective neutron mul
 
 #### Spontaneous Fission
 
-U235 has a halflife of 7.037 10^8 years and generates 1.86 neutrons. Spontaneous fission occurs 0.0003 times per g per s."""
+U235 has a half-life of 7.037 10^8 years and generates 1.86 neutrons on average. Spontaneous fission occurs 0.0003 times per g per s."""
 
 # ╔═╡ 1b34e902-bfbf-47a9-98eb-7f87d4321f7c
 const numberofspontaneousfis = 0.0003 # / g / s
@@ -1042,7 +1167,7 @@ const numberofspontaneousfis = 0.0003 # / g / s
 # ╔═╡ dbbb18a2-5f3f-4608-b6f7-ae6e842c357c
 md"""
 
-### Atomic bomb simulation
+### Toy neutron-transport simulation
 
 Some additional constants:
 """
@@ -1086,14 +1211,24 @@ begin
 	σa = CSV.read("lectures/data/sigma_absorption.txt", DataFrame)
 	σi = CSV.read("lectures/data/sigma_inelastic.txt", DataFrame)
 
+	function interpolate_cross_section(σdata::DataFrame, energy::Float64)
+		energies = σdata[:, 1]
+		values = σdata[:, 2]
+		energy <= first(energies) && return first(values)
+		energy >= last(energies) && return last(values)
+		i = searchsortedfirst(energies, energy)
+		x1, x2 = energies[i-1], energies[i]
+		y1, y2 = values[i-1], values[i]
+		return y1 + (energy - x1) / (x2 - x1) * (y2 - y1)
+	end
+
 	function Σ(energy::Float64) # 1 / cm
-	    i = findfirst(e -> e > energy, σt[:, 1])
-	    σ = σt[i, 2] + (energy - σt[i, 1]) / (σt[i-1, 1] - σt[i, 1]) * (σt[i-1, 2] - σt[i, 2])
+	    σ = interpolate_cross_section(σt, energy)
 	    nᵤ * σ * 1e-24
 	end;
 
-	function ΔtΔl(energy::Float64)
-	    Δl = -log(rand()) / Σ(energy)
+	function ΔtΔl(rng::AbstractRNG, energy::Float64)
+	    Δl = -log(rand(rng)) / Σ(energy)
 	    v = sqrt(2 * energy * q / Mₙ) * 100
 	    Δl / v, Δl
 	end;
@@ -1109,8 +1244,9 @@ begin
 	    generated :: Vector{Int64}
 	    neutrons :: Vector{Int64}
 	    times :: Vector{Float64}      # s
-	    function Bomb(radius::Real)
-	        new(radius, Float64[], Int64[], Float64[])
+		rng :: AbstractRNG
+	    function Bomb(radius::Real; rng::AbstractRNG=mc_rng())
+	        new(Float64(radius), Int64[], Int64[], Float64[], rng)
 	    end
 	end;
 
@@ -1118,18 +1254,18 @@ begin
 		r :: Float64                  # cm
 		cosθ :: Float64
 		energy :: Float64             # eV
-		function Neutron(r::Float64, energy::Float64, cosθ::Float64 = rand(cosΘdistr))
+		function Neutron(r::Float64, energy::Float64, cosθ::Float64)
 			new(r, cosθ, energy)
 		end
 	end
 	
-	function Neutron(sim::Simulation, bomb::Bomb, r::Float64, energy::Float64=energy[rand(wattdistr)] * 1e6)
-		neutron = Neutron(r, energy)
+	function Neutron(sim::Simulation, bomb::Bomb, r::Float64, neutron_energy::Float64=energy[rand(bomb.rng, wattdistr)] * 1e6)
+		neutron = Neutron(r, neutron_energy, rand(bomb.rng, cosΘdistr))
 		time = now(sim)
 		@info("$time: create neutron at position $r with cosθ = $(neutron.cosθ) and energy = $(neutron.energy) eV")
 		push!(bomb.times, time)
 		push!(bomb.neutrons, 1)
-		Δt, Δl = ΔtΔl(neutron.energy)
+		Δt, Δl = ΔtΔl(bomb.rng, neutron.energy)
 		@callback collision(timeout(sim, Δt), bomb, neutron, Δl)
 	end
 	
@@ -1143,18 +1279,13 @@ begin
 			push!(bomb.neutrons, -1)
 			push!(bomb.generated, 0)
 		else
-			i = findfirst(e -> e > neutron.energy, σt[:, 1])
-			σtot = σt[i, 2] + (neutron.energy - σt[i, 1]) / (σt[i-1, 1] - σt[i, 1]) * (σt[i-1, 2] - σt[i, 2])
-			i = findfirst(e -> e > neutron.energy, σf[:, 1])
-			σfis = σf[i, 2] + (neutron.energy - σf[i, 1]) / (σf[i-1, 1] - σf[i, 1]) * (σf[i-1, 2] - σf[i, 2])
-			i = findfirst(e -> e > neutron.energy, σa[:, 1])
-			σabs = σa[i, 2] + (neutron.energy - σa[i, 1]) / (σa[i-1, 1] - σa[i, 1]) * (σa[i-1, 2] - σa[i, 2])
-			i = findfirst(e -> e > neutron.energy, σi[:, 1])
-			i = i == 1 ? 2 : i
-			σin = σi[i, 2] + (neutron.energy - σi[i, 1]) / (σi[i-1, 1] - σi[i, 1]) * (σi[i-1, 2] - σi[i, 2])
-			rnd = rand()
+			σtot = interpolate_cross_section(σt, neutron.energy)
+			σfis = interpolate_cross_section(σf, neutron.energy)
+			σabs = interpolate_cross_section(σa, neutron.energy)
+			σin = interpolate_cross_section(σi, neutron.energy)
+			rnd = rand(bomb.rng)
 			if rnd < σfis / σtot
-				n = rand(numberofneutronsdistr)
+				n = rand(bomb.rng, numberofneutronsdistr)
 				@info("$(now(sim)): fission with creation of $n neutrons")
 				for _ in 1:n
 					Neutron(sim, bomb, r′)
@@ -1174,7 +1305,7 @@ begin
 				push!(bomb.times, time)
 				push!(bomb.neutrons, -1)
 			else
-				cosϕ = rand(cosϕdistr)
+				cosϕ = rand(bomb.rng, cosϕdistr)
 				cosψ = (A * cosϕ + 1) / sqrt(A^2 + 2 * A * cosϕ +1)
 				neutron.r = r′
 				neutron.energy *= 0.5 * (1 + α + (1 - α) * cosϕ)
@@ -1182,9 +1313,9 @@ begin
 				ψ = acos(cosψ)
 				θplusψ = θ + ψ
 				θminψ = ψ < π / 2 ? θ - ψ : θ - ψ + 2π
-				neutron.cosθ = cos(θplusψ + rand() * (θminψ - θplusψ))
+				neutron.cosθ = cos(θplusψ + rand(bomb.rng) * (θminψ - θplusψ))
 				@info("$(now(sim)): elastic scattering at position $r′ with cosθ = $(neutron.cosθ) and energy = $(neutron.energy) eV")
-				Δt, Δl = ΔtΔl(neutron.energy)
+				Δt, Δl = ΔtΔl(bomb.rng, neutron.energy)
 				@callback collision(timeout(sim, Δt), bomb, neutron, Δl)
 			end
 		end
@@ -1193,11 +1324,11 @@ begin
 
 	function spontaneousfission(ev::AbstractEvent, bomb::Bomb)
 	    sim = environment(ev)
-	    for _ in rand(numberofneutronsspontaneousdistr)
-	        Neutron(sim, bomb, rand() * bomb.radius)
+	    for _ in 1:rand(bomb.rng, numberofneutronsspontaneousdistr)
+	        Neutron(sim, bomb, rand(bomb.rng) * bomb.radius)
 	    end
 	    rate = ρᵤ * 4/3 * π * bomb.radius^3 * numberofspontaneousfis
-	    @callback spontaneousfission(timeout(sim, -log(rand()) / rate), bomb)
+	    @callback spontaneousfission(timeout(sim, -log(rand(bomb.rng)) / rate), bomb)
 	end;
 end
 
@@ -1206,7 +1337,7 @@ bomb = let
 	Logging.disable_logging(LogLevel(-1000));
 	myradius = 9
 	sim = Simulation()
-	bomb = Bomb(myradius)
+	bomb = Bomb(myradius; rng=mc_rng(10_001))
 	@callback spontaneousfission(timeout(sim, 0.0), bomb)
 	run(sim)
 	bomb
@@ -1225,13 +1356,13 @@ end
 # ╔═╡ 95895ea0-617f-4588-8066-e289dbed7bbc
 md"""
 ### Monte Carlo approach
-Now that we can run a single simulation, we can use this to determine the critical radius.
+Now that we can run a single simulation, we can run independent replications and observe how the average branching behaviour changes with the size parameter in this toy model.
 """
 
 # ╔═╡ 8c321132-b034-4e9b-a511-127c2736e49b
 begin
-	const RUNS = 100
-	const RADII = 5:12;
+	RUNS = RUN_EXPENSIVE_MONTE_CARLO ? 100 : 20
+	RADII = RUN_EXPENSIVE_MONTE_CARLO ? (5:12) : (6:2:10);
 	Logging.disable_logging(LogLevel(1000));
 end;
 
@@ -1241,7 +1372,7 @@ ks = let
 	for (i, r) in enumerate(RADII)
 		Threads.@threads for j in 1:RUNS # use multithreading if available  (each run is independent)
 			sim = Simulation()
-			bomb = Bomb(r)
+			bomb = Bomb(r; rng=mc_rng(20_000 + 100 * i + j))
 			@callback spontaneousfission(timeout(sim, 0.0), bomb)
 			run(sim)
 			ks[j, i] = mean(bomb.generated)
@@ -1266,8 +1397,10 @@ end
 # ╟─4665a540-e8c8-466e-a2bc-3e74983bd683
 # ╟─78afe080-f64f-4835-8f77-80ec906c2f13
 # ╠═88b449e2-8ba3-4202-a22c-56be1ee7297b
+# ╠═c9f01fb4-6a37-4f12-95f0-686f9f954f31
 # ╟─dc08f693-5ebc-44e8-b4b2-48e48aeee5c9
 # ╟─59c0990c-f11d-4895-9cdd-32d9d644e617
+# ╟─439f0f9f-bb4d-4f28-855f-2d20c5207e09
 # ╟─2d78885b-1673-4c75-a5c9-8ca7b4b9237e
 # ╠═f2445950-a23b-4e98-b72a-37c28f0e894c
 # ╠═40908b8a-6ed8-4442-b8bd-34c058b16de7
@@ -1279,7 +1412,8 @@ end
 # ╟─6e1d9ce1-d90b-4b9b-9e8e-9f474535c868
 # ╟─b90b8319-b2f9-4948-a500-a7b6518db502
 # ╟─6cc32888-d93f-473f-b4dc-0c21cb69608e
-# ╟─12241581-863f-4717-b825-ff0cf357cc9c
+# ╠═12241581-863f-4717-b825-ff0cf357cc9c
+# ╟─da0ccdb7-b5d9-490b-a52d-4e0a43a96f26
 # ╟─a783183d-50dd-4c7c-80ba-65c9d858682c
 # ╟─4b81af14-bc99-475b-a52b-f1aaa1e60a1e
 # ╟─b18f806c-8b26-4c54-b4a3-1c1acc2867d0
@@ -1292,8 +1426,10 @@ end
 # ╟─2476451f-eecb-4713-9023-c7d1e2f38c55
 # ╟─b11f2c5f-63f8-40bd-a90c-3598380860b4
 # ╟─0d8f3619-5af4-45f3-b358-636a655ce4a7
+# ╟─bcb15c89-7602-4116-84cb-595c2e648b89
+# ╠═f248de45-d152-43dc-a2ee-70f49b22b844
 # ╟─708ffc5b-83b6-48b2-a0d1-bdabd970ee9a
-# ╟─a0db54fa-9ee7-40dd-92f6-f29265f83c63
+# ╠═a0db54fa-9ee7-40dd-92f6-f29265f83c63
 # ╠═a39321e9-96f9-49e8-abb3-17fe4ab3a20e
 # ╠═dcee775b-4283-4165-89db-b5fc87e0116c
 # ╟─4707b42d-8200-4ceb-a206-6b2e25e233ae
