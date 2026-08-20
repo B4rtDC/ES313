@@ -200,26 +200,29 @@ plot(x, x, xflip=true, label="",
 
 # ╔═╡ fd5f008c-ec63-11ea-131c-11b728095a8a
 md"### Example  - Subplots
-In some cases, it is wishful to show multiple graphs on the same figure. This can be done either by a simple rectangular layout, or following a more advanced lay-out (seen below).
+In some cases, it is wishful to show multiple graphs on the same figure.
 
 When setting options after the global plot, they will be applied to all subplots. Below this is used to have the same domain and x-ticks for the different subplots.
 "
 
 # ╔═╡ fd4b49e0-ec63-11ea-23b6-d18af17f6219
 let
-	# only used to hold the title (small hack)
-	global_title = plot(title = "Standard subplot", grid=false, showaxis=false, ticks=false, bottom_margin = -10Plots.px)
-	# common settings
-	plotsettings = Dict(:marker => :circle, :ylims=>(0, 110), :legend_position => :topleft)
-	# actual plots
-	p1 = plot(x, x,   label=L"y=x",  title="straight line")
-	p2 = plot(x, x.^2,label=L"y=x^2",title="parabola")
-	subplots = plot(p1,p2; plotsettings...)
-	# setting some setting afterwards (note: this affects all subplots)
-	xlims!(subplots, 0,12)
-	xticks!(subplots, 0:2:10)
-	# final (global plot)
-	p_final = plot(global_title, subplots, layout=@layout([A{0.01h}; B]) )
+    plotsettings = Dict(:marker => :circle, :ylims => (0, 110), :legend_position => :topleft)
+    
+    p1 = plot(x, x,   label=L"y=x",   title="straight line")
+    p2 = plot(x, x.^2, label=L"y=x^2", title="parabola")
+    
+    p_final = plot(
+        p1, p2, 
+        plot_title = "Standard subplot",  # Native global title
+        plot_titlefontsize = 14;          # Optional styling
+        plotsettings...
+    )
+    
+    xlims!(p_final, 0, 12)
+    xticks!(p_final, 0:2:10)
+    
+    p_final
 end
 
 # ╔═╡ fd34e510-ec63-11ea-2bc4-17cd1d8fe2be

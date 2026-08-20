@@ -1394,18 +1394,20 @@ md"""
 
 # ╔═╡ a0139976-10d5-4525-aa42-ae6103dbb362
 md"""
-## Estimating ``\pi``
+## The Monty Hall Problem
 
-During the lectures you saw this statement:
+During the lectures, you saw how Monte Carlo simulations can solve non-intuitive probability puzzles:
 
 !!! info
-	Another way of estimating $\pi$ is dropping point in a square, and analyse the number of points that fall within the inscribed circle.
+	The **[Monty Hall problem](https://en.wikipedia.org/wiki/Monty_Hall_problem)** is a counterintuitive brain teaser based on the American TV show *Let's Make a Deal*. You are presented with three closed doors: behind one is a car (prize), and behind the other two are goats. 
+	
+	After you choose a door, the host (who knows what is behind every door) opens one of the remaining two doors to reveal a goat. He then offers you a choice: **stick with your original door, or switch to the other unopened door.**
 
 !!! tip
-	You can implement this very easily.
-	1. Run the MC simulation.
-	2. Make a figure representing your simulation.
-	3. Show the result.
+	You can simulate this strategy using Monte Carlo methods:
+	1. Simulate thousands of game rounds for both "sticking" and "switching" strategies.
+	2. Count the win ratios for each strategy over time.
+	3. Plot the convergence for each strategy.
 
 """
 
@@ -1452,7 +1454,7 @@ During the lectures you saw this statement:
 # ╠═324f6b86-81c0-469f-ac1e-de8fcc0b2b39
 # ╟─8aee80e0-da25-4438-9ca5-1803d725385b
 # ╠═7c1e3a47-0614-40d8-9274-e5d583054a48
-# ╠═31b39d05-147b-4b46-97b4-f10d57299e0f
+# ╟─31b39d05-147b-4b46-97b4-f10d57299e0f
 # ╠═7081956d-d929-45b0-b87c-b776dd7824db
 # ╟─16b57ff5-cbc6-4ac4-90ac-8bf4d95ffc04
 # ╠═ce2b2348-97fc-4eeb-9a4a-8cb1294eb562
@@ -1479,4 +1481,4 @@ During the lectures you saw this statement:
 # ╠═a7880826-836d-4a0b-a872-4fcf7c52edbc
 # ╟─6441e9aa-a25c-4485-b939-bfa87d3a7194
 # ╟─ac843054-1734-4f1d-b4a6-e764598cb975
-# ╠═a0139976-10d5-4525-aa42-ae6103dbb362
+# ╟─a0139976-10d5-4525-aa42-ae6103dbb362
