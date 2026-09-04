@@ -288,3 +288,23 @@
 │ 	- kwargs: Base.Pairs{Symbol, Base.CoreLogging.SimpleLogger, Tuple{Symbol}, @NamedTuple{speciallogger::Base.CoreLogging.SimpleLogger}}(:speciallogger => Base.CoreLogging.SimpleLogger(IOStream(<file ./applications/logging_demo_2.log>), Info, Dict{Any, Int64}()))
 │ 	- using logger <Base.CoreLogging.SimpleLogger(IOStream(<file ./applications/logging_demo_2.log>), Info, Dict{Any, Int64}())> 
 └ @ Main.var"workspace#3" /Users/thijsverhaeghe/Documents/KMS/ES313/ES313/applications/PS06-DES-1_Intro.jl#==#19b12fc6-1464-11eb-2fc1-cbb3f82479c5:44
+┌ Info: myspecialfun was invoked with:
+│ 	- args: (1,)
+│ 	- kwargs: Base.Pairs{Symbol, Base.CoreLogging.SimpleLogger, Tuple{Symbol}, @NamedTuple{speciallogger::Base.CoreLogging.SimpleLogger}}(:speciallogger => Base.CoreLogging.SimpleLogger(IOStream(<file ./applications/logging_demo_2.log>), Info, Dict{Any, Int64}()))
+│ 	- using logger <Base.CoreLogging.SimpleLogger(IOStream(<file ./applications/logging_demo_2.log>), Info, Dict{Any, Int64}())> 
+└ @ Main.var"workspace#3" /Users/thijsverhaeghe/Documents/KMS/ES313/ES313/applications/PS06-DES-1_Intro.jl#==#19b12fc6-1464-11eb-2fc1-cbb3f82479c5:44
+┌ Info: myspecialfun was invoked with:
+│ 	- args: (2,)
+│ 	- kwargs: Base.Pairs{Symbol, Base.CoreLogging.SimpleLogger, Tuple{Symbol}, @NamedTuple{speciallogger::Base.CoreLogging.SimpleLogger}}(:speciallogger => Base.CoreLogging.SimpleLogger(IOStream(<file ./applications/logging_demo_2.log>), Info, Dict{Any, Int64}()))
+│ 	- using logger <Base.CoreLogging.SimpleLogger(IOStream(<file ./applications/logging_demo_2.log>), Info, Dict{Any, Int64}())> 
+└ @ Main.var"workspace#3" /Users/thijsverhaeghe/Documents/KMS/ES313/ES313/applications/PS06-DES-1_Intro.jl#==#19b12fc6-1464-11eb-2fc1-cbb3f82479c5:44
+┌ Info: myspecialfun was invoked with:
+│ 	- args: (1,)
+│ 	- kwargs: Base.Pairs{Symbol, Base.CoreLogging.SimpleLogger, Tuple{Symbol}, @NamedTuple{speciallogger::Base.CoreLogging.SimpleLogger}}(:speciallogger => Base.CoreLogging.SimpleLogger(IOStream(<file ./applications/logging_demo_2.log>), Info, Dict{Any, Int64}()))
+│ 	- using logger <Base.CoreLogging.SimpleLogger(IOStream(<file ./applications/logging_demo_2.log>), Info, Dict{Any, Int64}())> 
+└ @ Main.var"workspace#5" /Users/thijsverhaeghe/Documents/KMS/ES313/ES313/myfiles/2025-2026/Pluto/PS07 - ConcurrentSim - Intro (solved).jl#==#19b12fc6-1464-11eb-2fc1-cbb3f82479c5:44
+┌ Info: myspecialfun was invoked with:
+│ 	- args: (2,)
+│ 	- kwargs: Base.Pairs{Symbol, Base.CoreLogging.SimpleLogger, Tuple{Symbol}, @NamedTuple{speciallogger::Base.CoreLogging.SimpleLogger}}(:speciallogger => Base.CoreLogging.SimpleLogger(IOStream(<file ./applications/logging_demo_2.log>), Info, Dict{Any, Int64}()))
+│ 	- using logger <Base.CoreLogging.SimpleLogger(IOStream(<file ./applications/logging_demo_2.log>), Info, Dict{Any, Int64}())> 
+└ @ Main.var"workspace#5" /Users/thijsverhaeghe/Documents/KMS/ES313/ES313/myfiles/2025-2026/Pluto/PS07 - ConcurrentSim - Intro (solved).jl#==#19b12fc6-1464-11eb-2fc1-cbb3f82479c5:44

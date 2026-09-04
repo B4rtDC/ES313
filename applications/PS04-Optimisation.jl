@@ -107,7 +107,7 @@ More often than not, a programming language is chosen for you. In larger framewo
 md"""
 # Optimisation Techniques in Julia
 
-In this section, we will cover some practical examples and implementations of the optimisation techniques seen in the lectures. For all practical purposes, we will exploit the appropriate libraries.
+In this section, we will cover some practical examples and implementations of the optimisation techniques seen in the lectures.
 
 """
 
