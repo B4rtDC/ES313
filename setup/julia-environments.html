@@ -799,7 +799,7 @@
             <a class="file" href="../Project.toml">Project.toml</a>
             <h3>The recipe</h3>
             <p>Lists the packages the course uses directly—the high-level intent of the environment.</p>
-            <p class="note">In this repository, exact versions are not pinned here.</p>
+            <p class="note">Exact versions are not pinned here, apart from three upper bounds that keep the graphics and imaging binaries loadable on Julia 1.10.0.</p>
           </article>
 
           <article class="model-card manifest">
@@ -892,6 +892,24 @@
           not replace Julia itself. The ES313 scripts therefore also require Julia <strong>1.10.x</strong>.
           Personal computers use Juliaup; <strong>CDN computers do not</strong> and use the system-installed
           <code>C:\Program Files\Julia-1.10\bin\julia.exe</code> instead.
+        </p>
+
+        <p class="version-note">
+          <strong>The lock is resolved for Julia 1.10.0</strong>—the release installed on the CDN machines and
+          the oldest one the course has to run on. You can read it at the top of
+          <a class="file" href="../Manifest.toml">Manifest.toml</a> as <code>julia_version</code>. Some binary
+          packages need support libraries that ship <em>inside</em> Julia, and those only ever gain symbols, so
+          an environment resolved on 1.10.0 also loads on every later 1.10.x. The reverse does not hold. On your
+          own computer you therefore do not need that exact patch release: <code>juliaup add 1.10</code> installs
+          the newest 1.10.x and is the right choice.
+        </p>
+
+        <p class="version-note">
+          <strong>Do not update the course packages yourself.</strong> Running <code>Pkg.update()</code> or adding
+          packages inside this environment can pull in binaries that require a newer Julia than the CDN machines
+          have—which breaks the course for everyone working on those machines, while still looking fine on your
+          laptop. Work in a separate environment for your own experiments, or ask the lecturer to add a package
+          to the course toolbox.
         </p>
       </section>
 

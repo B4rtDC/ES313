@@ -1,5 +1,5 @@
 # Setup
-This is a small guide intended to put you on your way for this course. We will be working with Julia v1.10.x for all applications. It is recommended that you do all this before attending class, because the installation might take a while. A speedy and stable internet connection is an added value.
+This is a small guide intended to put you on your way for this course. We will be working with Julia v1.10.x for all applications. The course environment is resolved for Julia **1.10.0** (the release installed on the CDN machines) and runs unchanged on every later 1.10.x, so on your own computer any 1.10.x will do. It is recommended that you do all this before attending class, because the installation might take a while. A speedy and stable internet connection is an added value.
 
 We try to make sure that the installation and configuration runs as smoothly as possible with a minimum of effort on your part. These guidelines work for Windows, MacOS and Linux. Occasionally there is a small difference between the platforms that will be made clear during this walkthrough. This guide has been successfully tested on Windows 11 Enterprise (CDN), MacOS and Ubuntu.
 
@@ -39,7 +39,7 @@ from the software center when connected to CDN and then connect to an open netwo
         juliaup add 1.10
         ```
 
-        The `juliaup` command only works after Juliaup itself has been installed.
+        The `juliaup` command only works after Juliaup itself has been installed. This installs the newest 1.10.x release, which is what you want: the course environment is built to load on Julia 1.10.0 and on everything above it within 1.10.x. You do not need to install 1.10.0 itself.
 2. Copy the configuration script from [here](https://raw.githubusercontent.com/B4rtDC/ES313/main/setup/config.jl) and store it as a .jl file (e.g. with Notepad++ or VSCode). Things to modify by yourself (if required):
     * For Windows: the path to your `Git` install. The default path is the one that should work for CDN, i.e.
         ```julia
@@ -108,6 +108,8 @@ Some lectures may get updates during the semester. If you have followed the inst
     git stash pop "stash@{0}"
     ```
     `git stash pop` reapplies the stashed changes to your working copy and removes that stash entry. If you only want to inspect your changes, use the first two commands.
+
+    :warning: Do not run `Pkg.update()` and do not add packages inside the course environment. Package updates can pull in binaries that need a newer Julia than the CDN machines have; that breaks the course on those machines while still working on your own laptop. Use a separate environment for your own experiments, or ask for a package to be added to the course toolbox.
 
     For your own sanity, the most straightforward way that will allow you to stay synced and at the same time have your own file to work in, is to rename the notebook and maybe move it in a working directory from within Pluto as soon as you open it for the first time.
 ### Doing some work (run when you want to work)
