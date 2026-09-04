@@ -10,6 +10,7 @@ DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
+GLFW_jll = "0656b61e-2033-5cc2-a64a-77c0f6c09b89"
 GLPK = "60bf3e95-4087-53dc-ae20-288a0d20c6a6"
 Git = "d7ba0133-e1db-5d97-8f8c-041e4b3a1eb2"
 GraphPlot = "a2cc645c-3eea-5389-862e-a155d0052231"
@@ -21,6 +22,7 @@ Images = "916415d5-f1e6-5110-898d-aaa5f9f070e0"
 Ipopt = "b6b21f68-93f8-5de0-b562-5493be1d77c9"
 JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
 LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
+LittleCMS_jll = "d3a379c0-f9a3-5b72-a4c0-6bf4d2e8af0f"
 Measures = "442fdcdd-2543-5da2-b0f3-8c86c306513e"
 NativeSVG = "5f95e7b2-fe07-4078-b4a7-f744f426795c"
 OSMMakie = "76b6901f-8821-46bb-9129-841bc9cfe677"
@@ -28,8 +30,25 @@ Optim = "429524aa-4258-5aef-a3af-852621145aeb"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 Pluto = "c3e4b0f8-55cb-11ea-2926-15256bba5781"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
+Qt6Base_jll = "c0090381-4147-56d7-9ebc-da0b1113ec56"
 ResumableFunctions = "c5292f4c-5179-55e1-98c5-05642aab7184"
 SimpleWeightedGraphs = "47aef6b3-ad0c-573a-a1e2-d07658019622"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
 Tulip = "6dd1b50a-3aae-11e9-10b5-ef983d2400fa"
+
+# The CDN Windows machines are stuck on Julia 1.10.0, which bundles an older GCC runtime
+# (CompilerSupportLibraries 1.0.5) than binaries built from mid-2025 onwards expect. Those
+# binaries load fine on a Mac/Linux/up-to-date-Windows Julia and fail on the CDN machines with
+#     could not load library "...\Qt6Test.dll"
+#     The specified procedure could not be found.
+# Qt6Base_jll, GLFW_jll and LittleCMS_jll are listed as direct dependencies only so that these
+# ceilings can be expressed here; nothing in the course loads them directly. They hold the whole
+# GR/Plots graphics chain (via Qt6Base and GLFW) and the ImageMagick/OpenJpeg imaging chain
+# (via LittleCMS) at versions that do load on Julia 1.10.0.
+# Read setup/maintaining.md before touching or relaxing these bounds.
+[compat]
+julia = "~1.10"
+GLFW_jll = "~3.4"
+LittleCMS_jll = "~2.16"
+Qt6Base_jll = "~6.7.1"

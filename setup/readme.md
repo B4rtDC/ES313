@@ -3,6 +3,8 @@ This is a small guide intended to put you on your way for this course. We will b
 
 We try to make sure that the installation and configuration runs as smoothly as possible with a minimum of effort on your part. These guidelines work for Windows, MacOS and Linux. Occasionally there is a small difference between the platforms that will be made clear during this walkthrough. This guide has been successfully tested on Windows 11 Enterprise (CDN), MacOS and Ubuntu.
 
+*Course staff: the package versions in this environment are constrained by the Julia version on the CDN machines. Read [maintaining.md](maintaining.md) before changing them.*
+
 New to Julia environments? After downloading the repository, open the one-page guide [Julia environments: one course, one reproducible toolbox](julia-environments.html) in your browser. It explains `Project.toml`, `Manifest.toml`, the shared `.julia` folder, and why the course setup is reproducible.
 
 ## Tools
@@ -122,7 +124,7 @@ Some lectures may get updates during the semester. If you have followed the inst
 2. By default the present working directory is changed to the one for this course, this means that you can open every single notebook simply by using a relative path e.g. `./applications/PS01-Cellular_Automata.jl` or `./lectures/00_Introduction.jl` (note the lowercase directory names, which matter on Linux). After typing `./`, you can even use the tab key for autocomplete.
 
 ### Troubleshooting
-* The setup scripts intentionally stop when they are not run with Julia 1.10.x. On personal computers, check `juliaup status` and use `julia +1.10 ...`. **CDN computers do not use Juliaup:** check that you are using `C:\Program Files\Julia-1.10\bin\julia.exe`.
+* The setup scripts intentionally stop when they are not run with Julia 1.10.x. On personal computers, check `juliaup status` and use `julia +1.10 ...`. **CDN computers do not use Juliaup:** check that you are using the Julia 1.10 executable from `C:\Program Files\`.
 * `ERROR: expected package GracefulPkg [828d9ff0] to be registered` (or the same message with another package name) means your local copy of the package registry is older than the course [manifest](julia-environments.html#mental-model) and could not be refreshed, typically because the CDN proxy blocks the update. Connect to an open network (pubnet or eduroam) and run the script again. If it persists, replace the registry copy from a Julia 1.10 REPL and re-run the script:
     ```julia
     using Pkg
@@ -130,6 +132,11 @@ Some lectures may get updates during the semester. If you have followed the inst
     Pkg.Registry.add("General")
     ```
     This only touches the registry (the list of available packages), not your installed packages or notebooks.
+* `ERROR: LoadError: InitError: could not load library "...\Qt6Test.dll"` followed by **The specified procedure could not be found**, with packages such as `GR`, `Plots`, `StatsPlots` or `ImageMagick` failing to precompile: a binary package in the course environment cannot be loaded by the Julia version on your machine. Nothing is wrong with your `.julia` folder, and re-running the installation will not help. Run the probe script and send the resulting `cdn_probe_report.txt` to the lecturer:
+    ```powershell
+    & "C:\Program Files\Julia-1.10\bin\julia.exe" "C:\path\to\ES313\setup\cdn_probe.jl"
+    ```
+    It lists the binaries that actually fail (usually one or two) instead of the long list of packages that depend on them. The fix is a version ceiling in the course `Project.toml`; see [maintaining.md](maintaining.md).
 * If installation still fails after checking the Julia version and network connection, damaged state in the shared `.julia` depot may be responsible. Resetting that folder is a broad, last-resort action: it affects every Julia project for your account and can remove Pluto notebooks stored there. On personal computers it can also remove Juliaup-managed Julia versions; the system Julia on a CDN computer remains installed. Do not delete the folder blindly. First read [what `.julia` contains, why a reset can help, and the machine-specific recovery sequence](julia-environments.html#depot-reset).
 
 ##  Overview of packages used
