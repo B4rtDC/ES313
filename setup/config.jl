@@ -48,6 +48,42 @@ end
 # Install & download required packages into environment
 cd(coursefolder)
 Pkg.activate(pwd())
+
+# Refresh the registry before instantiating. The course manifest pins recent packages
+# (e.g. GracefulPkg, a dependency of Pluto), which a stale registry copy in the shared
+# .julia depot does not know about; instantiate then stops with
+#     ERROR: expected package `GracefulPkg [828d9ff0]` to be registered
+# `Pkg.instantiate()` does not reliably fix this by itself: it only refreshes the registry
+# when nothing else already marked it as updated in this session (`Pkg.add("Git")` above
+# does exactly that) and when the registry is off its one-day cooldown. `Pkg.Registry.update()`
+# has no cooldown, so it always refreshes.
+@info "Updating the package registry"
+try
+    Pkg.Registry.update()
+catch err
+    @warn "Could not update the package registry; continuing with the local copy." exception=err
+end
+
 @info "Downloading required packages"
-Pkg.instantiate()
+try
+    Pkg.instantiate()
+catch err
+    if err isa Pkg.Types.PkgError && occursin("to be registered", err.msg)
+        @error """
+        The registry copy in your shared `.julia` depot is out of date and could not be refreshed,
+        so Pkg does not know the packages that the course manifest asks for.
+
+        This is almost always a network problem: registry updates are blocked behind the CDN proxy.
+        Connect to an open network (pubnet or eduroam) and run this script again. If it keeps failing,
+        replace the registry copy from a Julia 1.10 REPL:
+
+            using Pkg
+            rm(joinpath(DEPOT_PATH[1], "registries"); recursive=true, force=true)
+            Pkg.Registry.add("General")
+
+        and then re-run this script.
+        """
+    end
+    rethrow(err)
+end
 @info "Finished"

@@ -1,0 +1,1059 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A one-page guide to Julia project environments, the ES313 setup, and the .julia user depot.">
+  <title>Julia environments | ES313</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17202a;
+      --muted: #586575;
+      --paper: #fffdf8;
+      --paper-strong: #ffffff;
+      --line: #dfe3e7;
+      --blue: #3155a4;
+      --blue-soft: #e9efff;
+      --green: #16725f;
+      --green-soft: #e2f4ee;
+      --purple: #7556a8;
+      --purple-soft: #f0eafb;
+      --amber: #a35c00;
+      --amber-soft: #fff0d5;
+      --red: #a13d3d;
+      --red-soft: #fff0ed;
+      --shadow: 0 18px 50px rgba(23, 32, 42, 0.10);
+      --radius: 22px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 4% 5%, rgba(49, 85, 164, 0.13), transparent 24rem),
+        radial-gradient(circle at 96% 22%, rgba(22, 114, 95, 0.11), transparent 25rem),
+        #f3f1eb;
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+
+    a {
+      color: var(--blue);
+      text-underline-offset: 0.18em;
+      text-decoration-thickness: 0.08em;
+    }
+
+    a:hover {
+      text-decoration-thickness: 0.14em;
+    }
+
+    code,
+    pre {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    }
+
+    code {
+      background: rgba(23, 32, 42, 0.07);
+      border-radius: 0.32rem;
+      padding: 0.08rem 0.3rem;
+      font-size: 0.92em;
+    }
+
+    .shell {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 28px 24px 56px;
+    }
+
+    .topbar {
+      align-items: center;
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 22px;
+    }
+
+    .brand {
+      color: var(--ink);
+      font-size: 0.84rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-decoration: none;
+      text-transform: uppercase;
+    }
+
+    .back-link {
+      font-size: 0.9rem;
+      font-weight: 650;
+    }
+
+    .hero {
+      background: var(--paper);
+      border: 1px solid rgba(23, 32, 42, 0.08);
+      border-radius: 30px;
+      box-shadow: var(--shadow);
+      display: grid;
+      gap: 34px;
+      grid-template-columns: minmax(0, 1.5fr) minmax(255px, 0.7fr);
+      overflow: hidden;
+      padding: 50px;
+      position: relative;
+    }
+
+    .hero::after {
+      background: linear-gradient(140deg, var(--blue), var(--purple) 55%, var(--green));
+      border-radius: 999px;
+      content: "";
+      filter: blur(0.2px);
+      height: 9px;
+      left: 50px;
+      position: absolute;
+      right: 50px;
+      top: 0;
+    }
+
+    .eyebrow {
+      color: var(--green);
+      font-size: 0.78rem;
+      font-weight: 850;
+      letter-spacing: 0.14em;
+      margin: 0 0 12px;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin-top: 0;
+    }
+
+    h1 {
+      font-size: clamp(2.35rem, 6vw, 4.6rem);
+      letter-spacing: -0.055em;
+      line-height: 0.98;
+      margin-bottom: 22px;
+      max-width: 820px;
+    }
+
+    h2 {
+      font-size: clamp(1.65rem, 3vw, 2.35rem);
+      letter-spacing: -0.035em;
+      line-height: 1.08;
+      margin-bottom: 12px;
+    }
+
+    h3 {
+      font-size: 1.05rem;
+      line-height: 1.25;
+      margin-bottom: 8px;
+    }
+
+    .lede {
+      color: var(--muted);
+      font-size: 1.14rem;
+      margin-bottom: 0;
+      max-width: 720px;
+    }
+
+    .definition {
+      align-self: stretch;
+      background: #17202a;
+      border-radius: var(--radius);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 28px;
+    }
+
+    .definition .kicker {
+      color: #9edcca;
+      font-size: 0.76rem;
+      font-weight: 800;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+    }
+
+    .definition strong {
+      display: block;
+      font-size: 1.58rem;
+      letter-spacing: -0.025em;
+      line-height: 1.12;
+      margin: 20px 0;
+    }
+
+    .definition p {
+      color: #cbd4de;
+      font-size: 0.93rem;
+      margin-bottom: 0;
+    }
+
+    main {
+      display: grid;
+      gap: 22px;
+      margin-top: 22px;
+    }
+
+    section {
+      background: var(--paper-strong);
+      border: 1px solid rgba(23, 32, 42, 0.08);
+      border-radius: var(--radius);
+      padding: 36px;
+    }
+
+    .section-heading {
+      display: grid;
+      gap: 20px;
+      grid-template-columns: minmax(0, 1fr) minmax(220px, 0.55fr);
+      margin-bottom: 26px;
+    }
+
+    .section-heading > p {
+      align-self: end;
+      color: var(--muted);
+      margin-bottom: 0;
+    }
+
+    .model-grid,
+    .why-grid,
+    .reset-grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .model-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .model-card {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      min-height: 230px;
+      padding: 23px;
+      position: relative;
+    }
+
+    .model-card.project {
+      background: var(--blue-soft);
+      border-color: #c8d4f3;
+    }
+
+    .model-card.manifest {
+      background: var(--purple-soft);
+      border-color: #d9cef0;
+    }
+
+    .model-card.depot {
+      background: var(--green-soft);
+      border-color: #bfe2d6;
+    }
+
+    .card-number {
+      align-items: center;
+      background: rgba(255, 255, 255, 0.8);
+      border: 1px solid currentColor;
+      border-radius: 999px;
+      display: inline-flex;
+      font-size: 0.75rem;
+      font-weight: 850;
+      height: 30px;
+      justify-content: center;
+      margin-bottom: 20px;
+      width: 30px;
+    }
+
+    .model-card .file {
+      color: var(--ink);
+      display: inline-block;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 1.06rem;
+      font-weight: 800;
+      margin-bottom: 10px;
+    }
+
+    .model-card p {
+      color: #3d4855;
+      font-size: 0.93rem;
+      margin-bottom: 12px;
+    }
+
+    .model-card .note {
+      color: var(--muted);
+      font-size: 0.79rem;
+      margin: 0;
+    }
+
+    .equation {
+      align-items: center;
+      background: #f7f7f5;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      font-size: 0.95rem;
+      font-weight: 720;
+      gap: 9px;
+      justify-content: center;
+      margin-top: 14px;
+      padding: 17px;
+      text-align: center;
+    }
+
+    .equation .operator {
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    .course-flow {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .course-flow li {
+      background: #f7f7f5;
+      border-radius: 16px;
+      min-height: 152px;
+      padding: 22px 22px 20px;
+      position: relative;
+    }
+
+    .course-flow li:not(:last-child)::after {
+      align-items: center;
+      background: var(--paper-strong);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--blue);
+      content: "→";
+      display: flex;
+      font-size: 1rem;
+      font-weight: 900;
+      height: 27px;
+      justify-content: center;
+      position: absolute;
+      right: -20px;
+      top: 62px;
+      width: 27px;
+      z-index: 2;
+    }
+
+    .step-label {
+      color: var(--blue);
+      display: block;
+      font-size: 0.74rem;
+      font-weight: 850;
+      letter-spacing: 0.1em;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+    }
+
+    .course-flow p {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin: 8px 0 0;
+    }
+
+    .verb-grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: 1fr 1fr;
+      margin-top: 14px;
+    }
+
+    .verb {
+      border-left: 4px solid var(--blue);
+      padding: 5px 14px;
+    }
+
+    .verb:last-child {
+      border-left-color: var(--green);
+    }
+
+    .verb p {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin: 4px 0 0;
+    }
+
+    .why-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      margin-top: 25px;
+    }
+
+    .why-card {
+      border-top: 3px solid var(--blue);
+      padding: 15px 8px 4px 0;
+    }
+
+    .why-card:nth-child(2) {
+      border-top-color: var(--purple);
+    }
+
+    .why-card:nth-child(3) {
+      border-top-color: var(--green);
+    }
+
+    .why-card:nth-child(4) {
+      border-top-color: var(--amber);
+    }
+
+    .why-card p {
+      color: var(--muted);
+      font-size: 0.88rem;
+      margin-bottom: 0;
+    }
+
+    .version-note {
+      background: var(--amber-soft);
+      border-radius: 14px;
+      color: #6e4408;
+      margin: 24px 0 0;
+      padding: 15px 18px;
+    }
+
+    .version-note strong {
+      color: #573501;
+    }
+
+    .dark-section {
+      background: #17202a;
+      color: #f8fafc;
+    }
+
+    .dark-section h2,
+    .dark-section h3 {
+      color: #fff;
+    }
+
+    .dark-section .section-heading > p,
+    .dark-section p {
+      color: #c5ced8;
+    }
+
+    .path-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 8px 0 24px;
+    }
+
+    .path-row code {
+      background: #273441;
+      border: 1px solid #3c4b5a;
+      color: #e9f7f3;
+      padding: 0.42rem 0.62rem;
+    }
+
+    .depot-columns {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .depot-box {
+      background: #212d39;
+      border: 1px solid #364453;
+      border-radius: 16px;
+      padding: 22px;
+    }
+
+    .depot-box.safe {
+      border-top: 3px solid #62cbb0;
+    }
+
+    .depot-box.careful {
+      border-top: 3px solid #f2b45f;
+    }
+
+    .chip-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      list-style: none;
+      margin: 15px 0 0;
+      padding: 0;
+    }
+
+    .chip-list li {
+      background: #2e3b48;
+      border-radius: 999px;
+      color: #dbe4ec;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 0.76rem;
+      padding: 5px 9px;
+    }
+
+    .juliaup-warning {
+      background: #3a2e20;
+      border: 1px solid #735a35;
+      border-radius: 14px;
+      color: #f5e3c8;
+      margin: 15px 0 0;
+      padding: 15px 17px;
+    }
+
+    .juliaup-warning strong {
+      color: #ffd48f;
+    }
+
+    .reset-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      margin: 22px 0;
+    }
+
+    .reset-reason {
+      background: #f7f7f5;
+      border-radius: 15px;
+      padding: 18px;
+    }
+
+    .reset-reason p {
+      color: var(--muted);
+      font-size: 0.88rem;
+      margin-bottom: 0;
+    }
+
+    .rationale {
+      background: var(--green-soft);
+      border-left: 5px solid var(--green);
+      border-radius: 4px 15px 15px 4px;
+      padding: 19px 21px;
+    }
+
+    .rationale p:last-child {
+      color: #285b4e;
+      margin-bottom: 0;
+    }
+
+    .recovery {
+      display: grid;
+      gap: 24px;
+      grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+      margin-top: 28px;
+    }
+
+    .recovery h3 {
+      font-size: 1.25rem;
+    }
+
+    .checklist {
+      list-style: none;
+      margin: 15px 0 0;
+      padding: 0;
+    }
+
+    .checklist li {
+      border-bottom: 1px solid var(--line);
+      padding: 11px 0 11px 31px;
+      position: relative;
+    }
+
+    .checklist li::before {
+      align-items: center;
+      background: var(--blue-soft);
+      border-radius: 999px;
+      color: var(--blue);
+      content: attr(data-step);
+      display: flex;
+      font-size: 0.7rem;
+      font-weight: 850;
+      height: 21px;
+      justify-content: center;
+      left: 0;
+      position: absolute;
+      top: 13px;
+      width: 21px;
+    }
+
+    .decision-table {
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      overflow: hidden;
+    }
+
+    .decision-row {
+      display: grid;
+      grid-template-columns: minmax(150px, 0.62fr) minmax(0, 1.38fr);
+    }
+
+    .decision-row + .decision-row {
+      border-top: 1px solid var(--line);
+    }
+
+    .decision-row > div {
+      padding: 15px 17px;
+    }
+
+    .decision-row > div:first-child {
+      background: #f7f7f5;
+      font-weight: 750;
+    }
+
+    .decision-row p {
+      color: var(--muted);
+      font-size: 0.86rem;
+      margin: 4px 0 0;
+    }
+
+    .never-fixes {
+      background: var(--red-soft);
+      border-radius: 14px;
+      color: #703434;
+      margin: 18px 0 0;
+      padding: 15px 18px;
+    }
+
+    footer {
+      color: var(--muted);
+      display: flex;
+      flex-wrap: wrap;
+      font-size: 0.83rem;
+      gap: 14px 22px;
+      justify-content: space-between;
+      padding: 22px 5px 0;
+    }
+
+    footer p {
+      margin: 0;
+    }
+
+    footer nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+
+    @media (max-width: 850px) {
+      .hero,
+      .section-heading,
+      .recovery {
+        grid-template-columns: 1fr;
+      }
+
+      .model-grid,
+      .course-flow,
+      .reset-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .why-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .course-flow li {
+        min-height: auto;
+      }
+
+      .course-flow li:not(:last-child)::after {
+        bottom: -20px;
+        content: "↓";
+        left: 50%;
+        right: auto;
+        top: auto;
+        transform: translateX(-50%);
+      }
+    }
+
+    @media (max-width: 580px) {
+      .shell {
+        padding: 16px 12px 36px;
+      }
+
+      .hero,
+      section {
+        padding: 27px 22px;
+      }
+
+      .hero::after {
+        left: 22px;
+        right: 22px;
+      }
+
+      .depot-columns,
+      .verb-grid,
+      .why-grid,
+      .decision-row {
+        grid-template-columns: 1fr;
+      }
+
+      .decision-row > div:first-child {
+        padding-bottom: 7px;
+      }
+
+      .decision-row > div:last-child {
+        padding-top: 7px;
+      }
+    }
+
+    @media print {
+      @page {
+        margin: 12mm;
+      }
+
+      body {
+        background: #fff;
+        font-size: 10pt;
+      }
+
+      .shell {
+        max-width: none;
+        padding: 0;
+      }
+
+      .topbar {
+        margin-bottom: 10px;
+      }
+
+      .hero,
+      section {
+        box-shadow: none;
+        break-inside: avoid;
+      }
+
+      .dark-section,
+      .dark-section .depot-box,
+      .dark-section .juliaup-warning {
+        background: #fff;
+        border-color: #9ba3ab;
+        color: #111;
+      }
+
+      .dark-section h2,
+      .dark-section h3,
+      .dark-section p,
+      .dark-section .section-heading > p,
+      .dark-section .juliaup-warning,
+      .dark-section .juliaup-warning strong {
+        color: #111;
+      }
+
+      .dark-section .chip-list li,
+      .dark-section .path-row code {
+        background: #eee;
+        border-color: #bbb;
+        color: #111;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <nav class="topbar" aria-label="Course navigation">
+      <a class="brand" href="../README.md">ES313 · Setup note</a>
+      <a class="back-link" href="readme.md">← Back to setup</a>
+    </nav>
+
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Julia 1.10.x · one-page guide</p>
+        <h1>One course. One reproducible toolbox.</h1>
+        <p class="lede">
+          A Julia <strong>project environment</strong> tells Julia which packages belong to a project
+          and which resolved versions to load. “Virtual environment” is useful shorthand, but this is
+          not a virtual machine and it does not make a private copy of Julia.
+        </p>
+      </div>
+      <aside class="definition" aria-label="Key distinction">
+        <span class="kicker">Remember this</span>
+        <strong>The environment chooses.<br>The depot stores.</strong>
+        <p>
+          The files in ES313 describe the toolbox. The shared <code>.julia</code> folder stores the
+          packages, binaries, and caches used to build it.
+        </p>
+      </aside>
+    </header>
+
+    <main>
+      <section id="mental-model">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">The 20-second mental model</p>
+            <h2>A recipe, a lock, and a shared pantry</h2>
+          </div>
+          <p>
+            The first two live in the course repository and belong to this project. The third normally
+            lives in your home folder and is shared by all your Julia projects.
+          </p>
+        </div>
+
+        <div class="model-grid">
+          <article class="model-card project">
+            <span class="card-number">1</span><br>
+            <a class="file" href="../Project.toml">Project.toml</a>
+            <h3>The recipe</h3>
+            <p>Lists the packages the course uses directly—the high-level intent of the environment.</p>
+            <p class="note">In this repository, exact versions are not pinned here.</p>
+          </article>
+
+          <article class="model-card manifest">
+            <span class="card-number">2</span><br>
+            <a class="file" href="../Manifest.toml">Manifest.toml</a>
+            <h3>The lock</h3>
+            <p>Records the complete resolved dependency graph, including exact versions and source identities.</p>
+            <p class="note">It is generated by Julia’s package manager; do not edit it by hand.</p>
+          </article>
+
+          <article class="model-card depot">
+            <span class="card-number">3</span><br>
+            <span class="file">~/.julia/</span>
+            <h3>The shared pantry</h3>
+            <p>Holds downloaded package source, binary artifacts, registries, and compiled caches.</p>
+            <p class="note">Projects can reuse the same package files, so environments need not duplicate them.</p>
+          </article>
+        </div>
+
+        <div class="equation" role="group" aria-label="Environment summary">
+          <span><code>Project.toml</code> + <code>Manifest.toml</code></span>
+          <span class="operator">define this course environment</span>
+          <span>→</span>
+          <span><code>Pkg.instantiate()</code></span>
+          <span class="operator">materializes it using the depot</span>
+        </div>
+      </section>
+
+      <section id="course-workflow">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">In this course</p>
+            <h2>What the setup scripts do for you</h2>
+          </div>
+          <p>
+            ES313 deliberately uses one environment at the repository root for its lecture and application notebooks.
+          </p>
+        </div>
+
+        <ol class="course-flow">
+          <li>
+            <span class="step-label">Configure or update</span>
+            <strong><code>config.jl</code> / <code>update.jl</code></strong>
+            <p>Check Julia 1.10.x, activate the repository root, and instantiate the recorded dependencies.</p>
+          </li>
+          <li>
+            <span class="step-label">Start</span>
+            <strong><code>start.jl</code></strong>
+            <p>Activates that same root environment before launching Pluto.</p>
+          </li>
+          <li>
+            <span class="step-label">Work</span>
+            <strong>Course notebooks</strong>
+            <p>Use the shared course toolbox; notebook activation is an extra safety net.</p>
+          </li>
+        </ol>
+
+        <div class="verb-grid">
+          <div class="verb">
+            <strong><code>Pkg.activate(path)</code> selects</strong>
+            <p>It changes which project Julia considers active. By itself, it downloads nothing.</p>
+          </div>
+          <div class="verb">
+            <strong><code>Pkg.instantiate()</code> installs</strong>
+            <p>It downloads missing recorded packages and artifacts, then prepares them for use.</p>
+          </div>
+        </div>
+
+        <div class="why-grid" role="group" aria-label="Benefits of the course environment">
+          <article class="why-card">
+            <h3>Reproducible</h3>
+            <p>Students and instructors use the same resolved package graph.</p>
+          </article>
+          <article class="why-card">
+            <h3>Scoped</h3>
+            <p>The course dependencies take priority; another project’s lockfile does not decide what ES313 loads.</p>
+          </article>
+          <article class="why-card">
+            <h3>Recoverable</h3>
+            <p>The version-controlled recipe and lock can reconstruct missing local package state.</p>
+          </article>
+          <article class="why-card">
+            <h3>Efficient</h3>
+            <p>One setup serves all course notebooks, while compatible files are shared on disk.</p>
+          </article>
+        </div>
+
+        <p class="version-note">
+          <strong>The Julia runtime is a separate layer.</strong> An environment controls packages; it does
+          not replace Julia itself. The ES313 scripts therefore also require Julia <strong>1.10.x</strong>.
+          Personal computers use Juliaup; <strong>CDN computers do not</strong> and use the system-installed
+          <code>C:\Program Files\Julia-1.10\bin\julia.exe</code> instead.
+        </p>
+      </section>
+
+      <section class="dark-section" id="julia-depot">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Environment ≠ depot</p>
+            <h2>So what exactly is <code>.julia</code>?</h2>
+          </div>
+          <p>
+            It is normally Julia’s first <strong>user depot</strong>: shared storage for package management,
+            code loading, and user-level Julia state. It is not the ES313 environment itself.
+          </p>
+        </div>
+
+        <p>Default location (unless <code>JULIA_DEPOT_PATH</code> was changed):</p>
+        <div class="path-row" role="group" aria-label="Default Julia depot paths">
+          <code>C:\Users\YourAccount\.julia\</code>
+          <code>/Users/YourAccount/.julia/</code>
+          <code>/home/YourAccount/.julia/</code>
+        </div>
+
+        <div class="depot-columns">
+          <article class="depot-box safe">
+            <h3>Mostly downloaded or generated state</h3>
+            <p>Julia can usually fetch or rebuild these when a valid project is instantiated again.</p>
+            <ul class="chip-list" aria-label="Generated depot contents">
+              <li>packages/</li>
+              <li>artifacts/</li>
+              <li>registries/</li>
+              <li>compiled/</li>
+              <li>clones/</li>
+            </ul>
+          </article>
+          <article class="depot-box careful">
+            <h3>Potentially personal or important state</h3>
+            <p>A full deletion can also remove global environments, preferences, history, configuration, development work, or notebooks saved in Pluto’s default folder.</p>
+            <ul class="chip-list" aria-label="Potentially personal depot contents">
+              <li>environments/</li>
+              <li>config/startup.jl</li>
+              <li>dev/</li>
+              <li>pluto_notebooks/</li>
+              <li>scratchspaces/</li>
+              <li>prefs/</li>
+              <li>logs/</li>
+            </ul>
+          </article>
+        </div>
+
+        <p class="juliaup-warning">
+          <strong>CDN computers do not use Juliaup.</strong> They run the system-installed Julia at
+          <code>C:\Program Files\Julia-1.10\bin\julia.exe</code>. Resetting the user’s <code>.julia</code>
+          folder removes package state but does not uninstall that Julia executable. <strong>On personal
+          computers only,</strong> Juliaup stores installed Julia versions and its configuration under
+          <code>~/.julia</code> by default, so a full reset may require Juliaup repair and re-adding the 1.10 channel.
+        </p>
+      </section>
+
+      <section id="depot-reset">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Troubleshooting, explained</p>
+            <h2>Why can resetting <code>.julia</code> help?</h2>
+          </div>
+          <p>
+            The folder is not inherently a problem. A reset is useful only when local depot state has become
+            incomplete, damaged, or unusable.
+          </p>
+        </div>
+
+        <div class="reset-grid">
+          <article class="reset-reason">
+            <h3>Interrupted transfer</h3>
+            <p>Failed transfers or damaged downloaded state can leave Pkg unable to complete or use an installation.</p>
+          </article>
+          <article class="reset-reason">
+            <h3>Broken generated state</h3>
+            <p>A compiled cache can become stale or damaged after a failed update or system change.</p>
+          </article>
+          <article class="reset-reason">
+            <h3>Access problem</h3>
+            <p>Incorrect permissions, a lock, or problematic configuration can prevent Pkg from reading or writing.</p>
+          </article>
+        </div>
+
+        <div class="rationale">
+          <h3>The rationale for a clean reset</h3>
+          <p>
+            The course’s <code>Project.toml</code> and <code>Manifest.toml</code> remain safely in the ES313 folder.
+            Removing suspect local depot state gives <code>Pkg.instantiate()</code> an empty workspace in which to
+            download the recorded dependencies again and rebuild caches. In other words: <strong>keep the blueprint,
+            rebuild the local warehouse.</strong>
+          </p>
+        </div>
+
+        <div class="recovery">
+          <div>
+            <h3>Use the smallest reset first</h3>
+            <p>
+              Close Julia and Pluto. Confirm that you are using Julia 1.10.x, use a stable open network, and retry
+              the setup. If the error explicitly concerns precompilation, renaming only
+              <code>.julia/compiled/v1.10</code> is a much narrower reset; Julia will rebuild it.
+            </p>
+            <p>
+              To check which depot your Julia actually uses, start Julia exactly as described for your platform and enter this at the <code>julia&gt;</code> prompt:
+            </p>
+            <p><code>first(DEPOT_PATH)</code></p>
+          </div>
+
+          <div class="decision-table" role="group" aria-label="Depot reset choices">
+            <div class="decision-row">
+              <div>Rename a cache</div>
+              <div>
+                <strong>Narrow and reversible</strong>
+                <p>Best when the error clearly identifies generated cache state.</p>
+              </div>
+            </div>
+            <div class="decision-row">
+              <div>Rename all <code>.julia</code></div>
+              <div>
+                <strong>Broad, last-resort reset</strong>
+                <p>Affects every Julia project for your account and may also remove Juliaup’s installed runtimes.</p>
+              </div>
+            </div>
+            <div class="decision-row">
+              <div>Delete immediately</div>
+              <div>
+                <strong>Not recommended</strong>
+                <p>You lose the option to recover configuration, environments, history, Pluto notebooks, or work from <code>dev/</code>.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <h3 style="margin-top: 30px;">If a full reset is genuinely needed</h3>
+        <ol class="checklist">
+          <li data-step="1">Close every Julia, Pluto, and VS Code Julia process.</li>
+          <li data-step="2">Rename <code>.julia</code> to a backup name instead of deleting it. Preserve anything in <code>pluto_notebooks/</code> or <code>dev/</code>, and keep the backup until everything works.</li>
+          <li data-step="3"><strong>CDN computer:</strong> do not install or invoke Juliaup. Continue with <code>C:\Program Files\Julia-1.10\bin\julia.exe</code>; it remains installed after a depot reset.</li>
+          <li data-step="4"><strong>Personal computer:</strong> if <code>juliaup</code> no longer runs, reinstall or repair it first; then run <code>juliaup add 1.10</code>.</li>
+          <li data-step="5">Repeat the course’s complete <a href="readme.md">Getting started (do this once)</a> sequence on a stable network.</li>
+          <li data-step="6">Test <code>start.jl</code>. Do not copy generated folders such as <code>packages/</code>, <code>artifacts/</code>, <code>compiled/</code>, or <code>registries/</code> back.</li>
+          <li data-step="7">Recover only files you know you created or customized, such as notebooks in <code>pluto_notebooks/</code>, work in <code>dev/</code>, or <code>config/startup.jl</code>.</li>
+        </ol>
+
+        <p class="never-fixes">
+          <strong>A depot reset will not fix</strong> the wrong Julia version, a proxy or offline network,
+          an incorrect Git path, damaged files in the ES313 repository, or an error in notebook code.
+          It also triggers a large re-download and fresh precompilation, so it can take time.
+        </p>
+      </section>
+    </main>
+
+    <footer>
+      <p>ES313 · Mathematical Modeling and Simulation</p>
+      <nav aria-label="Further reading">
+        <a href="https://pkgdocs.julialang.org/v1/environments/">Julia environments</a>
+        <a href="https://pkgdocs.julialang.org/v1/toml-files/">Project &amp; Manifest</a>
+        <a href="https://docs.julialang.org/en/v1/base/constants/#Base.DEPOT_PATH">Depot contents</a>
+        <a href="https://github.com/JuliaLang/juliaup/blob/main/README.md#path-used-by-juliaup">Juliaup storage</a>
+      </nav>
+    </footer>
+  </div>
+</body>
+</html>

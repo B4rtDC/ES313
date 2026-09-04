@@ -3,6 +3,8 @@ This is a small guide intended to put you on your way for this course. We will b
 
 We try to make sure that the installation and configuration runs as smoothly as possible with a minimum of effort on your part. These guidelines work for Windows, MacOS and Linux. Occasionally there is a small difference between the platforms that will be made clear during this walkthrough. This guide has been successfully tested on Windows 11 Enterprise (CDN), MacOS and Ubuntu.
 
+New to Julia environments? After downloading the repository, open the one-page guide [Julia environments: one course, one reproducible toolbox](julia-environments.html) in your browser. It explains `Project.toml`, `Manifest.toml`, the shared `.julia` folder, and why the course setup is reproducible.
+
 ## Tools
 * You will be using the Julia REPL in combination with Pluto notebooks.
 * For code development you could use Notepad++ or Visual Studio Code (available in the CDN software center). There is a Julia language extension ([Notepad++](https://github.com/JuliaEditorSupport/julia-NotepadPlusPlus)/[VS Code](https://code.visualstudio.com/docs/languages/julia)) available for both. We use Visual Studio Code for this course.
@@ -85,7 +87,7 @@ You are now ready to start working on the course. Tested on:
 Some lectures may get updates during the semester. If you have followed the installation process, you can get the most recent version of the lecture by running the update script.
 
 0. On Windows, if required, modify the path to your `Git` installation (cf. configuration script).
-1. Run the update script from the setup folder with Julia 1.10. This will fetch updates from GitHub, sync them with your local files, and install the package versions specified by the course manifest. Local changes in tracked files are saved in a named [git stash](https://git-scm.com/docs/git-stash) before the update is pulled. Please note that you will no longer see those local changes after the update; they are however not gone.
+1. Run the update script from the setup folder with Julia 1.10. This will fetch updates from GitHub, sync them with your local files, and install the package versions specified by the course [manifest](julia-environments.html#mental-model). Local changes in tracked files are saved in a named [git stash](https://git-scm.com/docs/git-stash) before the update is pulled. Please note that you will no longer see those local changes after the update; they are however not gone.
     ```powershell
     & "C:\Program Files\Julia-1.10\bin\julia.exe" "C:\path\to\folder name with a space\ES313\setup\update.jl" # on CDN Windows
     ```
@@ -120,8 +122,15 @@ Some lectures may get updates during the semester. If you have followed the inst
 2. By default the present working directory is changed to the one for this course, this means that you can open every single notebook simply by using a relative path e.g. `./applications/PS01-Cellular_Automata.jl` or `./lectures/00_Introduction.jl` (note the lowercase directory names, which matter on Linux). After typing `./`, you can even use the tab key for autocomplete.
 
 ### Troubleshooting
-* The setup scripts intentionally stop when they are not run with Julia 1.10.x. On personal computers, check `juliaup status` and use `julia +1.10 ...`. On CDN Windows, check that you are using `C:\Program Files\Julia-1.10\bin\julia.exe`.
-* Should you experience troubles with the installation, you can always delete the files in `C:\\Users\\YourAccount\\.julia\\` (Windows), `/Users/YourAccount/.julia/`(Mac) or `/home/YourAccount/.julia` (Linux) and then repeat the getting started sequence.
+* The setup scripts intentionally stop when they are not run with Julia 1.10.x. On personal computers, check `juliaup status` and use `julia +1.10 ...`. **CDN computers do not use Juliaup:** check that you are using `C:\Program Files\Julia-1.10\bin\julia.exe`.
+* `ERROR: expected package GracefulPkg [828d9ff0] to be registered` (or the same message with another package name) means your local copy of the package registry is older than the course [manifest](julia-environments.html#mental-model) and could not be refreshed, typically because the CDN proxy blocks the update. Connect to an open network (pubnet or eduroam) and run the script again. If it persists, replace the registry copy from a Julia 1.10 REPL and re-run the script:
+    ```julia
+    using Pkg
+    rm(joinpath(DEPOT_PATH[1], "registries"); recursive=true, force=true)
+    Pkg.Registry.add("General")
+    ```
+    This only touches the registry (the list of available packages), not your installed packages or notebooks.
+* If installation still fails after checking the Julia version and network connection, damaged state in the shared `.julia` depot may be responsible. Resetting that folder is a broad, last-resort action: it affects every Julia project for your account and can remove Pluto notebooks stored there. On personal computers it can also remove Juliaup-managed Julia versions; the system Julia on a CDN computer remains installed. Do not delete the folder blindly. First read [what `.julia` contains, why a reset can help, and the machine-specific recovery sequence](julia-environments.html#depot-reset).
 
 ##  Overview of packages used
 

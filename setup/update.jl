@@ -41,5 +41,33 @@ catch err
     rethrow(err)
 end
 
+# refresh the registry first (see setup/config.jl for why instantiate does not always do this)
+@info "Updating the package registry"
+try
+    Pkg.Registry.update()
+catch err
+    @warn "Could not update the package registry; continuing with the local copy." exception=err
+end
+
 # install the package versions from Manifest.toml
-Pkg.instantiate()
+try
+    Pkg.instantiate()
+catch err
+    if err isa Pkg.Types.PkgError && occursin("to be registered", err.msg)
+        @error """
+        The registry copy in your shared `.julia` depot is out of date and could not be refreshed,
+        so Pkg does not know the packages that the course manifest asks for.
+
+        This is almost always a network problem: registry updates are blocked behind the CDN proxy.
+        Connect to an open network (pubnet or eduroam) and run this script again. If it keeps failing,
+        replace the registry copy from a Julia 1.10 REPL:
+
+            using Pkg
+            rm(joinpath(DEPOT_PATH[1], "registries"); recursive=true, force=true)
+            Pkg.Registry.add("General")
+
+        and then re-run this script.
+        """
+    end
+    rethrow(err)
+end
