@@ -136,23 +136,6 @@ md"""
 ### Understanding the rules
 """
 
-# ╔═╡ eab8e8f9-8528-460c-bdee-94fcbbc49d8e
-"""
-	rules(p::String)
-
-Obtain the rules that are applicable for our problem. We read the entire file and for each line we obtain the current state, the neighbors and the future state. We also account for all the possible circular permutations that can occurs. 
-
-The function returns a nested dictionary: [current state] => Dict([neigbors] => [future state])
-"""
-function rules(p::String; debug=false)
-		d = Dict()
-		for rule in readlines(p)
-			addrule!(d, rule; debug)
-		end
-
-		return d
-end
-
 # ╔═╡ b1d05970-3660-434a-b4a6-38cf867a9a99
 """
 	addrule!(d::Dict, rule::String; debug=false)
@@ -175,6 +158,23 @@ function addrule!(d::Dict, rule::String; debug=false)
 	end
 
 	return (current_state, neighbors, next_state)
+end
+
+# ╔═╡ eab8e8f9-8528-460c-bdee-94fcbbc49d8e
+"""
+	rules(p::String)
+
+Obtain the rules that are applicable for our problem. We read the entire file and for each line we obtain the current state, the neighbors and the future state. We also account for all the possible circular permutations that can occurs. 
+
+The function returns a nested dictionary: [current state] => Dict([neigbors] => [future state])
+"""
+function rules(p::String; debug=false)
+		d = Dict()
+		for rule in readlines(p)
+			addrule!(d, rule; debug)
+		end
+
+		return d
 end
 
 # ╔═╡ 1a0c018d-63bf-4ef3-a13b-49c02af54a2e
@@ -481,6 +481,26 @@ md"""
 	* **qn** - state wherein you reject the input being a palindrome.
 """
 
+# ╔═╡ 47d82617-79c5-416d-8ae8-92614df27f93
+md"""
+An example:
+
+| Curr tape | Curr state | Curr char | $\rightarrow$ | New state | Written char | Move | New tape |
+| :--- | :--- | :--- | :---: | :--- | :--- | :---: | :--- |
+| **4**440 | q1 | 4 | | p2 | 0 | R | 0**4**40 |
+| 0**4**40 | p2 | 4 | | p2 | 4 | R | 04**4**0 |
+| 04**4**0 | p2 | 4 | | p2 | 4 | R | 044**0** |
+| 044**0** | p2 | 0 | | r2 | 0 | L | 04**4**0 |
+| 04**4**0 | r2 | 4 | | q2 | 0 | L | 0**4**00 |
+| 0**4**00 | q2 | 4 | | q2 | 4 | L | **0**400 |
+| **0**400 | q2 | 0 | | q1 | 0 | R | 0**4**00 |
+| 0**4**00 | q1 | 4 | | p2 | 0 | R | 00**0**0 |
+| 00**0**0 | p2 | 0 | | r2 | 0 | L | 0**0**00 |
+| 0**0**00 | r2 | 0 | | q2 | 0 | L | **0**000 |
+| **0**000 | q2 | 0 | | q1 | 0 | R | 0**0**00 |
+| 0**0**00 | q1 | 0 | | qy | 0 | R | 00**0**0 |
+"""
+
 # ╔═╡ 43421788-e6f4-4a6b-ae64-93a04050954e
 md"""
 ## Implementation
@@ -535,4 +555,5 @@ md"""
 # ╟─8cfd0097-584e-49bb-93c6-9124093f038a
 # ╟─785790f1-e2e4-4c21-97ae-ed36e598149d
 # ╟─d5d1488e-9b2d-4bd6-a2bd-c796e9987ff2
+# ╟─47d82617-79c5-416d-8ae8-92614df27f93
 # ╟─43421788-e6f4-4a6b-ae64-93a04050954e

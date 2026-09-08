@@ -227,7 +227,7 @@ end
 
 # ╔═╡ fd34e510-ec63-11ea-2bc4-17cd1d8fe2be
 md"
-More advanced layouts can be created with the `@layout` macro (already briefly seen in the previous example). The lay-out should be seen as a multidimensional array. Specific layouts can be obtained by using the curly brackets and specifying the desired dimensions for width and height. The example below creates a plot with three subplots divided over two rows. In the first row, `p1` gets 30% of the total width and `p2` gets the remaing 70%.
+More advanced layouts can be created with the `@layout` macro. The lay-out should be seen as a multidimensional array. Specific layouts can be obtained by using the curly brackets and specifying the desired dimensions for width and height. The example below creates a plot with three subplots divided over two rows. In the first row, `p1` gets 30% of the total width and `p2` gets the remaing 70%.
     
 Notice how we can pass the `yscale` (and most other) arguments as an argument to subplots that required similar scales.
 "
@@ -664,7 +664,7 @@ If you are very eager, consult this series of [Youtube](https://youtu.be/mZFlLkP
 # ╟─02c1eefc-ec63-11ea-35cc-83d7cffdc592
 # ╟─5b3d1a0b-c162-4d51-b7c0-7aa46a734b87
 # ╠═5b3db6f3-38be-4be2-9b66-b4ddd6c049bb
-# ╟─a9547c5c-09e4-4336-b3d2-62e93efb15ac
+# ╠═a9547c5c-09e4-4336-b3d2-62e93efb15ac
 # ╟─59cd14ec-bda2-4342-b087-2c4640787c87
 # ╟─650f5346-ec62-11ea-3007-bded07c572b4
 # ╟─b813bcb4-b055-4b9f-b9d7-82464a67b934
