@@ -448,7 +448,7 @@ For the sake of this exercise, we will work with integers. E.g. [1, 2, 3, 2, 1] 
 # ╔═╡ 785790f1-e2e4-4c21-97ae-ed36e598149d
 md"""
 ## General description
-Based on the [turing machines palindromes](https://github.com/smrfeld/turing_machines_palindromes/tree/master) (python) implementation
+Based on the [turing machines palindromes](https://github.com/smrfeld/turing_machines_palindromes/tree/master) (python) implementation. To help you understand what a Turing Machine is and what we are up to, take a look first at [turingmachine.io](https://turingmachine.io).
 """
 
 # ╔═╡ d5d1488e-9b2d-4bd6-a2bd-c796e9987ff2
