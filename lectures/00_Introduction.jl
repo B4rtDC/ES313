@@ -187,27 +187,29 @@ md"""
 The schedule shown below is an indication. You should have your computer at any time.
 
 ### Theory
-- 02 Sep
-- 04 Sep
-- 11 Sep
-- 16 Sep
-- 18 Sep
-- 30 Sep
-- 07 Oct
-- 09 Oct
-- 04 Nov (assistant)
-- 06 Nov (assistant)
+- 02 Sep (1Hr)
+- 04 Sep (1Hr)
+- 11 Sep (2Hr)
+- 16 Sep (1Hr)
+- 18 Sep (2Hr)
+- 30 Sep (1Hr)
+- 07 Oct (1Hr; assistant)
+- 09 Oct (2Hr; assistant)
+- 30 Oct (2Hr; assistant)
 
 
 ### Practice
-- 23 Sep
-- 25 Sep (TBC if students available)
-- 02 Oct
-- 21 Oct
-- 23 Oct
-- 28 Oct
-- 30 Oct
-- 13 Nov
+- 04 Sep (1Hr)
+- 09 Sep (1Hr)
+- 23 Sep (1Hr)
+- 25 Sep (2Hr)
+- 02 Oct (2Hr; New date to be found)
+- 21 Oct (1Hr)
+- 22 Oct (2Hr)*
+- 28 Oct (2Hr)*
+- 29 Oct (2Hr - N)*
+- 30 Oct (2Hr - F)*
+- 06 Nov (2Hr; assistant)
 
 ### Blended learning / self study days
 - 14 Oct
